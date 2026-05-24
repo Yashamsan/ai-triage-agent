@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI(title="AI Triage Agent")
@@ -44,6 +44,8 @@ def classify(message: str) -> str:
 
 @app.post("/triage", response_model=TriageResponse)
 def triage(request: TriageRequest):
+    if not request.message.strip():
+        raise HTTPException(status_code=422, detail="message cannot be empty")
     intent = classify(request.message)
     response = INTENTS[intent]["response"] if intent != "unknown" else FALLBACK_RESPONSE
     return TriageResponse(intent=intent, response=response)
