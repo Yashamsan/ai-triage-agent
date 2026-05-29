@@ -1,0 +1,14 @@
+[
+  {"message": "I've been double charged for last month", "expected_intent": "billing"},
+  {"message": "Can you help me reset my password?", "expected_intent": "password_reset"},
+  {"message": "The website won't load for me", "expected_intent": "technical_support"},
+  {"message": "I want to speak with your supervisor immediately", "expected_intent": "escalation"},
+  {"message": "My account is locked and I can't get in", "expected_intent": "password_reset"},
+  {"message": "I need a refund on my subscription", "expected_intent": "billing"},
+  {"message": "The app crashes every time I open it", "expected_intent": "technical_support"},
+  {"message": "This is completely unacceptable, I need to file a complaint", "expected_intent": "escalation"},
+  {"message": "I forgot the email address I used to sign up", "expected_intent": "password_reset"},
+  {"message": "When does my next invoice come out?", "expected_intent": "billing"},
+  {"message": "I keep getting a 500 error on checkout", "expected_intent": "technical_support"},
+  {"message": "Get me your manager right now", "expected_intent": "escalation"}
+]
