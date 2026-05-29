@@ -62,7 +62,6 @@ def classify(message: str) -> ClassifierOutput:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message},
         ],
-        response_format={"type": "json_object"},
         temperature=0,
     )
     raw = llm_response.choices[0].message.content
