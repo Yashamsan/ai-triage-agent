@@ -2,6 +2,14 @@
 
 Customer support intent classification API. Week 1 used keyword matching; Week 2 replaced it with LLM reasoning via LiteLLM — swap providers with a single env var.
 
+## Architecture
+
+The app follows a multi-agent chatbot pattern:
+
+- **Agent state** (per-prompt, ephemeral): tracked via `@observe()` spans on the `classify()` function. Each LLM call creates a Langfuse span capturing input, output, and execution.
+- **Conversation memory** (per-session, persistent): tracked via Langfuse sessions. Pass a `session_id` in the request body and all traces sharing that ID are grouped into one Langfuse session.
+- **Chatbot orchestrator**: the FastAPI `POST /triage` endpoint routes prompts to the classifier agent, optionally attached to a session context.
+
 ## Endpoints
 
 - `GET /health` — verify the server is alive
