@@ -3,3 +3,4 @@ uvicorn[standard]==0.34.3
 pydantic==2.11.4
 litellm==1.40.28
 python-dotenv==1.1.0
+langfuse>=2.55.0

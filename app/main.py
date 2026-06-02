@@ -4,6 +4,7 @@ import os
 import litellm
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from langfuse import observe, propagate_attributes
 from pydantic import BaseModel, ValidationError
 
 load_dotenv()
@@ -39,6 +40,7 @@ VALID_INTENTS = set(INTENT_RESPONSES.keys())
 
 class TriageRequest(BaseModel):
     message: str
+    session_id: str | None = None
 
 
 class ClassifierOutput(BaseModel):
@@ -54,6 +56,7 @@ class TriageResponse(BaseModel):
     needs_escalation: bool
 
 
+@observe()
 def classify(message: str) -> ClassifierOutput:
     model = os.getenv("LLM_MODEL", "deepseek/deepseek-chat")
     llm_response = litellm.completion(
@@ -72,11 +75,16 @@ def classify(message: str) -> ClassifierOutput:
     return result
 
 
+@observe()
 @app.post("/triage", response_model=TriageResponse)
 def triage(request: TriageRequest):
     if not request.message.strip():
         raise HTTPException(status_code=422, detail="message cannot be empty")
-    result = classify(request.message)
+    if request.session_id:
+        with propagate_attributes(session_id=request.session_id):
+            result = classify(request.message)
+    else:
+        result = classify(request.message)
     return TriageResponse(
         intent=result.intent,
         response=INTENT_RESPONSES[result.intent],
