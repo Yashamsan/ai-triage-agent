@@ -1,0 +1,99 @@
+description: "AI Triage Agent — Intent Classification Accuracy"
+
+providers:
+  - id: http
+    config:
+      url: http://localhost:8000/triage
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        message: "{{message}}"
+
+prompts:
+  - "classify this customer message"
+
+tests:
+  - vars:
+      message: "I've been double charged for last month"
+    assert:
+      - type: contains-json
+        value:
+          intent: billing
+
+  - vars:
+      message: "Can you help me reset my password?"
+    assert:
+      - type: contains-json
+        value:
+          intent: password_reset
+
+  - vars:
+      message: "The website won't load for me"
+    assert:
+      - type: contains-json
+        value:
+          intent: technical_support
+
+  - vars:
+      message: "I want to speak with your supervisor immediately"
+    assert:
+      - type: contains-json
+        value:
+          intent: escalation
+
+  - vars:
+      message: "My account is locked and I can't get in"
+    assert:
+      - type: contains-json
+        value:
+          intent: password_reset
+
+  - vars:
+      message: "I need a refund on my subscription"
+    assert:
+      - type: contains-json
+        value:
+          intent: billing
+
+  - vars:
+      message: "The app crashes every time I open it"
+    assert:
+      - type: contains-json
+        value:
+          intent: technical_support
+
+  - vars:
+      message: "This is completely unacceptable, I need to file a complaint"
+    assert:
+      - type: contains-json
+        value:
+          intent: escalation
+
+  - vars:
+      message: "I forgot the email address I used to sign up"
+    assert:
+      - type: contains-json
+        value:
+          intent: password_reset
+
+  - vars:
+      message: "When does my next invoice come out?"
+    assert:
+      - type: contains-json
+        value:
+          intent: billing
+
+  - vars:
+      message: "I keep getting a 500 error on checkout"
+    assert:
+      - type: contains-json
+        value:
+          intent: technical_support
+
+  - vars:
+      message: "Get me your manager right now"
+    assert:
+      - type: contains-json
+        value:
+          intent: escalation
