@@ -58,7 +58,9 @@ class TriageResponse(BaseModel):
 
 @observe()
 def classify(message: str) -> ClassifierOutput:
-    model = os.getenv("LLM_MODEL", "deepseek/deepseek-chat")
+    model = os.getenv("LLM_MODEL", "cheap-classifier")
+    api_base = os.getenv("LITELLM_PROXY_URL", None)
+    api_key = os.getenv("LITELLM_MASTER_KEY", None)
     llm_response = litellm.completion(
         model=model,
         messages=[
@@ -66,6 +68,8 @@ def classify(message: str) -> ClassifierOutput:
             {"role": "user", "content": message},
         ],
         temperature=0,
+        **({"api_base": api_base} if api_base else {}),
+        **({"api_key": api_key} if api_key else {}),
     )
     raw = llm_response.choices[0].message.content
     data = json.loads(raw)

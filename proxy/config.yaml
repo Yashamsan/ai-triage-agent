@@ -1,0 +1,31 @@
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+
+model_list:
+  - model_name: cheap-classifier
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+      rpm: 60
+      max_tokens: 256
+      temperature: 0
+    model_info:
+      mode: chat
+      cost_per_token: 0.00000014
+      cost_per_output_token: 0.00000028
+
+  - model_name: expensive-fallback
+    litellm_params:
+      model: claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 30
+      max_tokens: 512
+    model_info:
+      mode: chat
+      base_model: claude-haiku
