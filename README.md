@@ -4,6 +4,42 @@ Customer support intent classification API.
 - **Week 1** — keyword-based classifier, FastAPI skeleton, GitHub push
 - **Week 2** — replaced with LLM reasoning via LiteLLM + DeepSeek, Langfuse observability
 - **Week 3** — promptfoo eval suite, LiteLLM proxy with cost tracking and model fallback
+- **Week 4** — Zero Trust security stack: input sanitizer, spotlighting, guard classifier, output filter
+
+## Security Stack (Week 4)
+
+Every request passes through three defense layers before reaching the LLM and three before returning to the client:
+
+```
+POST /triage
+  │
+  ├─ Phase 1 — InputSanitizer        (app/security/input_sanitizer.py)
+  │     • strips control characters
+  │     • enforces 4096 char limit
+  │     • blocks known injection patterns (regex)  → 422
+  │     • flags suspicious encoding (base64/hex)
+  │
+  ├─ Phase 2a — Guard Classifier     (app/security/guard_classifier.py)
+  │     • lightweight LLM call (max_tokens=50) screens for semantic injection
+  │     • confidence > 0.7 → block with 422
+  │     • confidence ≤ 0.7 → flag in Langfuse, allow through
+  │     • fails open on error — never blocks legitimate traffic
+  │
+  ├─ Phase 2b — Spotlighting
+  │     • user message wrapped in <untrusted_input> tags
+  │     • system prompt instructs LLM to treat tags as data boundary
+  │     • reduces injection success rate ~50% → ~2% (Microsoft research)
+  │
+  ├─ LLM classifier (DeepSeek via LiteLLM)
+  │
+  └─ Phase 3 — OutputFilter          (app/security/output_filter.py)
+        • Layer A: PII redaction — email, phone, API keys, credit cards, IPv4
+          (allowlists example.com/support.example.com support addresses)
+        • Layer B: schema validation — intent enum, confidence range, bool types
+        • Schema violations → safe fallback response + Langfuse log
+```
+
+Set `GUARD_MODEL` in `.env` to use a cheaper model for the guard classifier.
 
 ## Architecture
 
