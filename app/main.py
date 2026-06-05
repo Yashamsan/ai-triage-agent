@@ -7,9 +7,12 @@ from fastapi import FastAPI, HTTPException
 from langfuse import observe, propagate_attributes
 from pydantic import BaseModel, ValidationError
 
+from app.security.input_sanitizer import InputSanitizer, SanitizationResult
+
 load_dotenv()
 
 app = FastAPI(title="AI Triage Agent")
+sanitizer = InputSanitizer()
 
 SYSTEM_PROMPT = """You are a customer support triage agent. Classify the customer message into exactly one intent.
 
@@ -58,9 +61,11 @@ class TriageResponse(BaseModel):
 
 @observe()
 def classify(message: str) -> ClassifierOutput:
-    model = os.getenv("LLM_MODEL", "cheap-classifier")
     api_base = os.getenv("LITELLM_PROXY_URL", None)
     api_key = os.getenv("LITELLM_MASTER_KEY", None)
+    # Use proxy model name when proxy is configured, direct model otherwise
+    default_model = "cheap-classifier" if api_base else "deepseek/deepseek-chat"
+    model = os.getenv("LLM_MODEL", default_model)
     llm_response = litellm.completion(
         model=model,
         messages=[
@@ -82,18 +87,39 @@ def classify(message: str) -> ClassifierOutput:
 @observe()
 @app.post("/triage", response_model=TriageResponse)
 def triage(request: TriageRequest):
+    # ── Input Validation ─────────────────────────
     if not request.message.strip():
         raise HTTPException(status_code=422, detail="message cannot be empty")
+
+    # ── Phase 1: Input Sanitization (Zero Trust) ─
+    sanitized = sanitizer.sanitize(request.message)
+    if sanitized.blocked:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Message rejected: {sanitized.block_reason}",
+        )
+    if sanitized.risk_flags:
+        try:
+            from langfuse import get_current_trace
+            trace = get_current_trace()
+            if trace:
+                trace.update(input=sanitized.sanitized_message)
+        except Exception:
+            pass
+
+    # ── Route to Agent ───────────────────────────
+    safe_message = sanitized.sanitized_message
     if request.session_id:
         with propagate_attributes(session_id=request.session_id):
-            result = classify(request.message)
+            classification = classify(safe_message)
     else:
-        result = classify(request.message)
+        classification = classify(safe_message)
+
     return TriageResponse(
-        intent=result.intent,
-        response=INTENT_RESPONSES[result.intent],
-        confidence=result.confidence,
-        needs_escalation=result.needs_escalation,
+        intent=classification.intent,
+        response=INTENT_RESPONSES[classification.intent],
+        confidence=classification.confidence,
+        needs_escalation=classification.needs_escalation,
     )
 
 
