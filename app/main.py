@@ -9,11 +9,13 @@ from pydantic import BaseModel, ValidationError
 
 from app.security.guard_classifier import guard_classify, GuardResult
 from app.security.input_sanitizer import InputSanitizer, SanitizationResult
+from app.security.output_filter import OutputFilter, PIIFilterResult
 
 load_dotenv()
 
 app = FastAPI(title="AI Triage Agent")
 sanitizer = InputSanitizer()
+output_filter = OutputFilter()
 
 SYSTEM_PROMPT = """You are a customer support triage agent. Classify the customer message into exactly one intent.
 
@@ -150,12 +152,37 @@ def triage(request: TriageRequest):
     else:
         classification = classify(safe_message)
 
-    return TriageResponse(
+    # ── Phase 3: Output Filtering (Enterprise) ───
+    response_text = INTENT_RESPONSES[classification.intent]
+
+    # Layer A: PII scan on response text
+    pii_result = output_filter.filter_pii(response_text)
+
+    # Layer B: Schema validation
+    triage_response = TriageResponse(
         intent=classification.intent,
-        response=INTENT_RESPONSES[classification.intent],
+        response=pii_result.filtered_text,
         confidence=classification.confidence,
         needs_escalation=classification.needs_escalation,
     )
+    schema_issues = output_filter.validate_triage_response(triage_response)
+
+    if schema_issues:
+        try:
+            from langfuse import get_current_trace
+            trace = get_current_trace()
+            if trace:
+                trace.update(metadata={"schema_issues": schema_issues})
+        except Exception:
+            pass
+        return TriageResponse(
+            intent="unknown",
+            response="We're experiencing a technical issue. Please try again later.",
+            confidence=0.0,
+            needs_escalation=False,
+        )
+
+    return triage_response
 
 
 @app.get("/health")
