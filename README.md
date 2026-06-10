@@ -5,6 +5,7 @@ Customer support intent classification API.
 - **Week 2** — replaced with LLM reasoning via LiteLLM + DeepSeek, Langfuse observability
 - **Week 3** — promptfoo eval suite, LiteLLM proxy with cost tracking and model fallback
 - **Week 4** — Zero Trust security stack: input sanitizer, spotlighting, guard classifier, output filter
+- **Week 5** — LangGraph agent (3-node StateGraph), PostgreSQL + pgvector RAG tool layer, sentence-transformers embeddings
 
 ## Security Stack (Week 4)
 
@@ -40,6 +41,33 @@ POST /triage
 ```
 
 Set `GUARD_MODEL` in `.env` to use a cheaper model for the guard classifier.
+
+## Agent Graph (Week 5)
+
+3-node LangGraph `StateGraph` — `classifier → tool_runner → responder/escalation`:
+
+```
+POST /triage
+  │
+  ├─ [Security stack — Phase 1/2/3]
+  │
+  └─ triage_agent.invoke(state)
+       │
+       ├─ classifier node    → LLM classifies intent (DeepSeek/LiteLLM)
+       │
+       ├─ tool_runner node   → dispatches to DB tool by intent
+       │     • password_reset / billing / technical_support → faq_lookup()
+       │       embeds message → cosine similarity search in pgvector
+       │       returns closest FAQ article from PostgreSQL
+       │     • escalation → ticket_lookup()
+       │       creates support ticket in DB with embedding
+       │
+       └─ responder node     → formats response (or escalation_node if flagged)
+```
+
+**Database:** PostgreSQL 17 + pgvector 0.8.2 — 384-dim vectors via `all-MiniLM-L6-v2`
+
+**Seeded data:** 6 FAQ articles (2 per intent) + 6 support tickets
 
 ## Architecture
 
@@ -89,12 +117,28 @@ cp .env.example .env
 Get a DeepSeek key at [platform.deepseek.com](https://platform.deepseek.com/) (~$0.14/1M tokens).
 Get Langfuse keys at [cloud.langfuse.com](https://cloud.langfuse.com/) (free tier).
 
-**Step 3 — Start the server**
+**Step 3 — Set up PostgreSQL (Week 5+)**
+```bash
+# Install PostgreSQL 17 + pgvector (Ubuntu/Debian)
+sudo apt install postgresql-17 postgresql-17-pgvector
+sudo service postgresql start
+
+# Create database and enable extension
+sudo -u postgres psql -c "CREATE DATABASE triage_agent;"
+sudo -u postgres psql -d triage_agent -c "CREATE EXTENSION vector;"
+
+# Apply schema and seed data
+sudo -u postgres psql -d triage_agent -f app/schema.sql
+python app/seed_data.py
+# → Seeded 6 FAQs and 6 tickets
+```
+
+**Step 4 — Start the server**
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Step 4 — Test it**
+**Step 5 — Test it**
 ```bash
 # Health check
 curl http://localhost:8000/health
