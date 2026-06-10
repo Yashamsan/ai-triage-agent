@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.main import classify
+from app.classifier import classify
 
 TEST_DATA = json.loads((Path(__file__).parent / "test_data.json").read_text())
 
