@@ -5,3 +5,5 @@ litellm==1.40.28
 python-dotenv==1.1.0
 langfuse>=2.55.0
 langgraph>=0.4.0
+psycopg2-binary>=2.9.9
+sentence-transformers>=3.0.0

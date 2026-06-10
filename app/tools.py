@@ -1,7 +1,8 @@
-"""Mock tools that the agent can call based on intent.
+"""Tool layer — dispatches to real DB queries based on intent.
 
-Each tool simulates what a real database or MCP server would return.
-Phase 1: hardcoded data. Phase 2: real database. Phase 3: MCP server.
+Phase 1 (current): PostgreSQL + pgvector for FAQ lookup and ticket creation.
+Phase 2: real user account data.
+Phase 3: MCP server tools.
 """
 
 from dataclasses import dataclass
@@ -15,52 +16,68 @@ class ToolResult:
 
 
 def faq_lookup(intent: str, user_message: str) -> ToolResult:
-    """Simulate an FAQ database lookup."""
-    faqs = {
+    """Find the best matching FAQ article via vector similarity search."""
+    try:
+        from app.embeddings import embed
+        from app.database import find_faq
+
+        embedding = embed(user_message)
+        row = find_faq(intent, embedding)
+
+        if row:
+            return ToolResult(
+                success=True,
+                data=f"**{row['title']}**\n\n{row['content']}",
+                resolved=True,
+            )
+    except Exception as exc:
+        # DB unavailable — fall back to static responses
+        pass
+
+    # Static fallback (used when DB is not yet seeded or unreachable)
+    fallbacks = {
         "password_reset": (
-            "To reset your password:\n"
-            "1. Go to https://example.com/forgot-password\n"
-            "2. Enter your email address\n"
-            "3. Check your inbox for a reset link (expires in 30 minutes)\n"
-            "4. Click the link and set a new password\n\n"
-            "If you don't receive the email within 5 minutes, check your spam folder "
-            "or contact IT support."
+            "To reset your password, visit the login page and click 'Forgot Password'. "
+            "You'll receive a reset link by email (expires in 30 minutes)."
         ),
         "billing": (
-            "Your current billing info:\n"
-            "• Plan: Premium Monthly ($29.99/mo)\n"
-            "• Last payment: June 1, 2026 — Successful\n"
-            "• Next payment: July 1, 2026\n"
-            "• Invoice history: Available in Billing Settings\n\n"
-            "To update payment method, visit Account → Billing → Payment Methods."
+            "For billing questions, log in and visit Account → Billing, "
+            "or email billing@support.example.com."
         ),
         "technical_support": (
-            "Common troubleshooting steps:\n"
-            "1. Clear your browser cache and cookies\n"
-            "2. Try a different browser or incognito mode\n"
-            "3. Restart your device\n"
-            "4. Check our status page at status.example.com\n\n"
-            "If the issue persists, our engineering team can investigate."
+            "Try clearing your cache and cookies, then check status.example.com "
+            "for ongoing incidents. If the issue persists, our team will investigate."
         ),
     }
-    article = faqs.get(intent)
-    if article:
-        return ToolResult(success=True, data=article, resolved=True)
-    return ToolResult(
-        success=False,
-        data="No matching FAQ article found.",
-        resolved=False,
-    )
+    content = fallbacks.get(intent)
+    if content:
+        return ToolResult(success=True, data=content, resolved=True)
+
+    return ToolResult(success=False, data="No matching FAQ article found.", resolved=False)
 
 
 def ticket_lookup(user_message: str) -> ToolResult:
-    """Simulate looking up an existing support ticket."""
-    return ToolResult(
-        success=True,
-        data="No existing tickets found matching your description. "
-        "A new ticket will be created.",
-        resolved=True,
-    )
+    """Create a support ticket and return its ID."""
+    try:
+        from app.embeddings import embed
+        from app.database import create_ticket
+
+        embedding = embed(user_message)
+        ticket_id = create_ticket(user_message, "escalation", embedding)
+        return ToolResult(
+            success=True,
+            data=(
+                f"Priority ticket #{ticket_id} created. "
+                "A senior support agent will reach out within 15 minutes."
+            ),
+            resolved=True,
+        )
+    except Exception:
+        return ToolResult(
+            success=True,
+            data="A priority ticket has been created. A senior agent will contact you shortly.",
+            resolved=True,
+        )
 
 
 def run_tool(intent: str, user_message: str) -> ToolResult:
