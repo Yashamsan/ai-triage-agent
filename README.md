@@ -29,13 +29,16 @@ openssl rand -hex 32      # → LANGFUSE_ENCRYPTION_KEY
 ```bash
 # Make sure Docker Desktop is running
 cd docker
-docker compose up -d
+docker compose --env-file .env.langfuse up -d
 ```
 
 **Step 3 — Wait for initialization (~2-3 min), then check logs**
 ```bash
-docker compose logs -f langfuse-web
+docker compose --env-file .env.langfuse logs -f langfuse-web
 # Look for: "Ready" in the output
+
+docker compose --env-file .env.langfuse ps
+# All 6 services should show "healthy" or "Up"
 ```
 
 **Step 4 — Create API keys**

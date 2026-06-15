@@ -7,8 +7,8 @@
 # Usage:
 #   cd docker
 #   # 1. Edit .env.langfuse — change ALL passwords/keys marked CHANGEME
-#   # 2. docker compose up          # foreground, see logs
-#   #    docker compose up -d       # background (detached)
+#   # 2. docker compose --env-file .env.langfuse up          # foreground
+#   #    docker compose --env-file .env.langfuse up -d       # background
 #   # 3. Open http://localhost:3000
 #   # 4. Log in with the email/password from your .env.langfuse
 #   # 5. Go to Project Settings → generate API keys
