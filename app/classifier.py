@@ -1,10 +1,19 @@
 """LLM classifier — extracted to break circular import between main.py and agent_graph.py."""
 
+# load_dotenv before langfuse import so SDK picks up correct credentials
+from dotenv import load_dotenv
+load_dotenv()
+
 import json
 import os
 
 import litellm
+from langfuse import observe
 from pydantic import BaseModel
+
+# LiteLLM native Langfuse integration — auto-traces every completion() call
+litellm.success_callback = ["langfuse"]
+litellm.failure_callback = ["langfuse"]
 
 SYSTEM_PROMPT = """You are a customer support triage agent. Classify the customer message into exactly one intent.
 
@@ -38,6 +47,7 @@ class ClassifierOutput(BaseModel):
     needs_escalation: bool
 
 
+@observe(name="classify", as_type="span")
 def classify(message: str) -> ClassifierOutput:
     """Classify a customer message using an LLM."""
     api_base = os.getenv("LITELLM_PROXY_URL", None)

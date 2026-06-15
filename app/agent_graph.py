@@ -12,6 +12,7 @@ Routing:
 
 from typing import Literal, TypedDict
 
+from langfuse import observe
 from langgraph.graph import END, StateGraph
 
 from app.classifier import classify, ClassifierOutput
@@ -34,8 +35,8 @@ class AgentState(TypedDict):
 
 # ── Nodes ──────────────────────────────────────────────────────────────
 
+@observe(name="classifier-node")
 def classifier_node(state: AgentState) -> dict:
-    """Node 1: Classify the user message using the existing LLM classifier."""
     result: ClassifierOutput = classify(state["message"])
     return {
         "intent": result.intent,
@@ -44,8 +45,8 @@ def classifier_node(state: AgentState) -> dict:
     }
 
 
+@observe(name="tool-runner-node")
 def tool_runner_node(state: AgentState) -> dict:
-    """Node 2: Run the appropriate tool based on classified intent."""
     tool_result = run_tool(state["intent"], state["message"])
     return {
         "tool_output": tool_result.data,
@@ -53,8 +54,8 @@ def tool_runner_node(state: AgentState) -> dict:
     }
 
 
+@observe(name="responder-node")
 def responder_node(state: AgentState) -> dict:
-    """Node 3a: Build a friendly response using tool output."""
     response = (
         f"**{state['intent'].replace('_', ' ').title()}**\n\n"
         f"{state['tool_output']}\n\n"
@@ -64,8 +65,8 @@ def responder_node(state: AgentState) -> dict:
     return {"response_text": response}
 
 
+@observe(name="escalation-node")
 def escalation_node(state: AgentState) -> dict:
-    """Node 3b: Generate escalation response."""
     response = (
         "**Escalated to Senior Agent**\n\n"
         "I understand this needs a human touch. I've created a priority ticket "
