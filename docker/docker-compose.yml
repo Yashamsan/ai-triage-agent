@@ -38,13 +38,13 @@ x-langfuse-worker-env: &langfuse-worker-env
   REDIS_AUTH: "${LANGFUSE_REDIS_AUTH}"
   LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: "${MINIO_ROOT_USER}"
   LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: "${MINIO_ROOT_PASSWORD}"
-  LANGFUSE_S3_EVENT_UPLOAD_BUCKET_NAME: "langfuse-events"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: "langfuse-events"
   LANGFUSE_S3_EVENT_UPLOAD_REGION: "us-east-1"
   LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: "http://minio:9000"
   LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
   LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: "${MINIO_ROOT_USER}"
   LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: "${MINIO_ROOT_PASSWORD}"
-  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET_NAME: "langfuse-media"
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: "langfuse-media"
   LANGFUSE_S3_MEDIA_UPLOAD_REGION: "us-east-1"
   LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: "http://minio:9000"
   LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
@@ -91,7 +91,10 @@ services:
       CLICKHOUSE_USER: "${LANGFUSE_CLICKHOUSE_USER}"
       CLICKHOUSE_PASSWORD: "${LANGFUSE_CLICKHOUSE_PASSWORD}"
       TZ: UTC
-    volumes: [langfuse_clickhouse_data:/var/lib/clickhouse, langfuse_clickhouse_logs:/var/log/clickhouse-server]
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+      - ./clickhouse-config.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
     healthcheck: {test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"], interval: 5s, timeout: 5s, retries: 10, start_period: 1s}
     restart: unless-stopped
 
