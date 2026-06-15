@@ -1,0 +1,124 @@
+# LangFuse v3 — Self-Hosted Observability Stack
+#
+# Brings up: langfuse-web (UI/API), langfuse-worker (async),
+# postgres, clickhouse, redis, minio (S3-compatible storage).
+#
+# Prerequisites: Docker + Docker Compose plugin
+# Usage:
+#   cd docker
+#   # 1. Edit .env.langfuse — change ALL passwords/keys marked CHANGEME
+#   # 2. docker compose up          # foreground, see logs
+#   #    docker compose up -d       # background (detached)
+#   # 3. Open http://localhost:3000
+#   # 4. Log in with the email/password from your .env.langfuse
+#   # 5. Go to Project Settings → generate API keys
+#   # 6. Copy those keys into your ai-triage-agent .env
+#
+# IMPORTANT:
+#   - External port mappings for postgres/clickhouse/redis are REMOVED
+#     to avoid conflicts with your existing local PostgreSQL (triage-agent)
+#     and other services. LangFuse containers communicate via Docker network.
+#   - MinIO API port is on 9090 (not default 9000) to avoid conflicts.
+#   - All containers run with TZ=UTC as required by ClickHouse.
+
+version: "3.8"
+
+x-langfuse-worker-env: &langfuse-worker-env
+  NEXTAUTH_URL: "http://localhost:3000"
+  DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+  SALT: "${LANGFUSE_SALT}"
+  ENCRYPTION_KEY: "${LANGFUSE_ENCRYPTION_KEY}"
+  TELEMETRY_ENABLED: "${LANGFUSE_TELEMETRY_ENABLED:-false}"
+  CLICKHOUSE_MIGRATION_URL: "clickhouse://clickhouse:9000"
+  CLICKHOUSE_URL: "http://clickhouse:8123"
+  CLICKHOUSE_USER: "${LANGFUSE_CLICKHOUSE_USER}"
+  CLICKHOUSE_PASSWORD: "${LANGFUSE_CLICKHOUSE_PASSWORD}"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "${LANGFUSE_REDIS_PORT:-6379}"
+  REDIS_AUTH: "${LANGFUSE_REDIS_AUTH}"
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: "${MINIO_ROOT_USER}"
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: "${MINIO_ROOT_PASSWORD}"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET_NAME: "langfuse-events"
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: "us-east-1"
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: "http://minio:9000"
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: "${MINIO_ROOT_USER}"
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: "${MINIO_ROOT_PASSWORD}"
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET_NAME: "langfuse-media"
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: "us-east-1"
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: "http://minio:9000"
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+
+services:
+  langfuse-web:
+    image: "docker.io/langfuse/langfuse:3"
+    ports: ["${LANGFUSE_WEB_PORT:-3000}:3000"]
+    depends_on: [postgres, minio, redis, clickhouse]
+    environment:
+      <<: *langfuse-worker-env
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET}"
+      LANGFUSE_INIT_ORG_ID: "${LANGFUSE_INIT_ORG_ID}"
+      LANGFUSE_INIT_ORG_NAME: "${LANGFUSE_INIT_ORG_NAME}"
+      LANGFUSE_INIT_PROJECT_ID: "${LANGFUSE_INIT_PROJECT_ID}"
+      LANGFUSE_INIT_PROJECT_NAME: "${LANGFUSE_INIT_PROJECT_NAME}"
+      LANGFUSE_INIT_USER_EMAIL: "${LANGFUSE_INIT_USER_EMAIL}"
+      LANGFUSE_INIT_USER_NAME: "${LANGFUSE_INIT_USER_NAME}"
+      LANGFUSE_INIT_USER_PASSWORD: "${LANGFUSE_INIT_USER_PASSWORD}"
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: "docker.io/langfuse/langfuse-worker:3"
+    depends_on: [postgres, minio, redis, clickhouse]
+    environment: {<<: *langfuse-worker-env}
+    restart: unless-stopped
+
+  postgres:
+    image: "docker.io/postgres:17"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      TZ: UTC
+      PGTZ: UTC
+    volumes: [langfuse_postgres_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"], interval: 3s, timeout: 3s, retries: 10}
+    restart: unless-stopped
+
+  clickhouse:
+    image: "docker.io/clickhouse/clickhouse-server:latest"
+    environment:
+      CLICKHOUSE_DB: "${CLICKHOUSE_DB}"
+      CLICKHOUSE_USER: "${LANGFUSE_CLICKHOUSE_USER}"
+      CLICKHOUSE_PASSWORD: "${LANGFUSE_CLICKHOUSE_PASSWORD}"
+      TZ: UTC
+    volumes: [langfuse_clickhouse_data:/var/lib/clickhouse, langfuse_clickhouse_logs:/var/log/clickhouse-server]
+    healthcheck: {test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"], interval: 5s, timeout: 5s, retries: 10, start_period: 1s}
+    restart: unless-stopped
+
+  minio:
+    image: "cgr.dev/chainguard/minio:latest"
+    entrypoint: ["sh", "-c"]
+    command: ["mkdir -p /data/langfuse-events /data/langfuse-media && minio server --address \":9000\" --console-address \":9001\" /data"]
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    ports:
+      - "${MINIO_API_PORT:-9090}:9000"   # S3 API
+      - "127.0.0.1:9091:9001"            # Web Console (local only)
+    volumes: [langfuse_minio_data:/data]
+    healthcheck: {test: ["CMD-SHELL", "mc ready local"], interval: 3s, timeout: 5s, retries: 5, start_period: 1s}
+    restart: unless-stopped
+
+  redis:
+    image: "docker.io/redis:7"
+    command: ["redis-server", "--requirepass", "${LANGFUSE_REDIS_AUTH}", "--maxmemory-policy", "noeviction"]
+    volumes: [langfuse_redis_data:/data]
+    healthcheck: {test: ["CMD-SHELL", "redis-cli -a ${LANGFUSE_REDIS_AUTH} ping | grep -q PONG"], interval: 3s, timeout: 10s, retries: 10}
+    restart: unless-stopped
+
+volumes:
+  langfuse_postgres_data:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:
+  langfuse_redis_data:
