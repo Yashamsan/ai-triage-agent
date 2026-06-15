@@ -6,6 +6,73 @@ Customer support intent classification API.
 - **Week 3** — promptfoo eval suite, LiteLLM proxy with cost tracking and model fallback
 - **Week 4** — Zero Trust security stack: input sanitizer, spotlighting, guard classifier, output filter
 - **Week 5** — LangGraph agent (3-node StateGraph), PostgreSQL + pgvector RAG tool layer, sentence-transformers embeddings
+- **Week 6** — Self-hosted LangFuse v3 observability stack (Docker), full retrieval metrics instrumentation
+
+## LangFuse v3 Self-Hosted Setup (Week 6)
+
+Replaces the cloud LangFuse with a fully local stack: `langfuse-web`, `langfuse-worker`, PostgreSQL, ClickHouse, Redis, MinIO.
+
+**Step 1 — Fill in secrets**
+```bash
+cd docker
+# Generate crypto values:
+openssl rand -base64 32   # → NEXTAUTH_SECRET
+openssl rand -hex 32      # → LANGFUSE_ENCRYPTION_KEY
+
+# Edit .env.langfuse — replace every CHANGEME_* value:
+#   NEXTAUTH_SECRET, POSTGRES_PASSWORD, LANGFUSE_SALT, LANGFUSE_ENCRYPTION_KEY
+#   LANGFUSE_CLICKHOUSE_PASSWORD, LANGFUSE_REDIS_AUTH, MINIO_ROOT_PASSWORD
+#   LANGFUSE_INIT_USER_EMAIL, LANGFUSE_INIT_USER_PASSWORD
+```
+
+**Step 2 — Start the stack**
+```bash
+# Make sure Docker Desktop is running
+cd docker
+docker compose up -d
+```
+
+**Step 3 — Wait for initialization (~2-3 min), then check logs**
+```bash
+docker compose logs -f langfuse-web
+# Look for: "Ready" in the output
+```
+
+**Step 4 — Create API keys**
+1. Open [http://localhost:3000](http://localhost:3000)
+2. Log in with the email/password from `docker/.env.langfuse` (`LANGFUSE_INIT_USER_*`)
+3. Go to **Project Settings → API Keys → Generate**
+4. Copy `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`
+
+**Step 5 — Wire to the triage agent**
+
+Edit the root `.env`:
+```
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_BASE_URL=http://localhost:3000
+```
+
+**Step 6 — Verify traces appear**
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+curl -s -X POST http://localhost:8000/triage \
+  -H "Content-Type: application/json" \
+  -d '{"message": "I forgot my password", "session_id": "test-1"}'
+# Check http://localhost:3000 — trace should appear within ~10s
+```
+
+**Port conflicts / troubleshooting**
+
+| Symptom | Fix |
+|---|---|
+| `port already allocated` | Change `LANGFUSE_WEB_PORT` or `MINIO_API_PORT` in `docker/.env.langfuse` |
+| `Cannot connect to database` | Internal PG still starting — wait 2-3 min, then `docker compose restart langfuse-web` |
+| No traces in UI | Confirm `LANGFUSE_BASE_URL=http://localhost:3000` (not the cloud URL) in root `.env` |
+| `Docker not found` | Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
+
+> Note: `docker/.env.langfuse` is gitignored — secrets never leave your machine.
 
 ## Security Stack (Week 4)
 
