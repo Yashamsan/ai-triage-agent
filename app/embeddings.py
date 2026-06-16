@@ -13,12 +13,12 @@ from langfuse import observe
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer as _ST
 
-_model: "_ST | None" = None
+_model: _ST | None = None
 MODEL_NAME = "all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384
 
 
-def _get_model() -> "_ST":
+def _get_model() -> _ST:
     global _model
     if _model is None:
         from sentence_transformers import SentenceTransformer

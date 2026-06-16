@@ -1,4 +1,3 @@
-import pytest
 from app.security.input_sanitizer import InputSanitizer
 
 sanitizer = InputSanitizer()

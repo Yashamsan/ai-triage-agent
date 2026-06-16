@@ -1,5 +1,6 @@
 # load_dotenv MUST run before any langfuse import — SDK reads env vars at import time
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from pathlib import Path
@@ -11,7 +12,6 @@ from fastapi.staticfiles import StaticFiles
 from langfuse import observe, propagate_attributes
 from pydantic import BaseModel
 
-from app.classifier import classify, ClassifierOutput
 from app.agent_graph import triage_agent
 from app.security.guard_classifier import guard_classify
 from app.security.input_sanitizer import InputSanitizer

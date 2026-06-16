@@ -14,6 +14,7 @@ TEST_DATA = json.loads((Path(__file__).parent / "test_data.json").read_text())
 _results: dict[str, list[bool]] = defaultdict(list)
 
 
+@pytest.mark.llm
 @pytest.mark.parametrize("case", TEST_DATA, ids=lambda c: c["message"][:50])
 def test_classify(case):
     result = classify(case["message"])

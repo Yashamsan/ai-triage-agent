@@ -6,6 +6,7 @@ These unit tests validate the module structure, prompt format, and error paths.
 """
 
 import pytest
+
 from app.security.guard_classifier import (
     GUARD_SYSTEM_PROMPT,
     GuardResult,
@@ -44,6 +45,7 @@ class TestGuardResult:
 class TestGuardClassifyFallback:
     """Verify guard_classify handles errors gracefully (fail-open)."""
 
+    @pytest.mark.llm
     def test_fails_open_on_error(self):
         """Passing an empty string should fail open, not crash the endpoint."""
         result = guard_classify("")

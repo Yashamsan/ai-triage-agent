@@ -10,9 +10,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from app.database import apply_schema, insert_faq, create_ticket, get_conn
+from app.database import apply_schema, create_ticket, get_conn, insert_faq
 from app.embeddings import embed_batch
 
 FAQ_ARTICLES = [

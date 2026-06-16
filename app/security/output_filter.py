@@ -70,7 +70,6 @@ class OutputFilter:
 
     def filter_pii(self, text: str) -> PIIFilterResult:
         """Scan and redact PII from a response string, respecting allowlists."""
-        original = text
         redacted: list[str] = []
 
         def _redact_email(m: re.Match) -> str:

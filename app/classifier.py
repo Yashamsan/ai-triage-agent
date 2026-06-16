@@ -2,6 +2,7 @@
 
 # load_dotenv before langfuse import so SDK picks up correct credentials
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import json

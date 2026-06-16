@@ -15,9 +15,8 @@ from typing import Literal, TypedDict
 from langfuse import observe
 from langgraph.graph import END, StateGraph
 
-from app.classifier import classify, ClassifierOutput
+from app.classifier import ClassifierOutput, classify
 from app.tools import run_tool
-
 
 # ── State ──────────────────────────────────────────────────────────────
 

@@ -7,3 +7,7 @@ uvicorn.err.log
 docker/.env.langfuse
 .agents/
 skills-lock.json
+.venv/
+htmlcov/
+.pytest_cache/
+.ruff_cache/

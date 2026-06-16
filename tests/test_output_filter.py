@@ -1,8 +1,8 @@
 """Tests for output filter — PII redaction + schema validation."""
 
-import pytest
-from app.security.output_filter import OutputFilter, PIIFilterResult
-from app.main import ClassifierOutput, TriageResponse
+from app.classifier import ClassifierOutput
+from app.main import TriageResponse
+from app.security.output_filter import OutputFilter
 
 filter = OutputFilter()
 
