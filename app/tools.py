@@ -5,7 +5,18 @@ Phase 2: real user account data.
 Phase 3: MCP server tools.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+
+from langfuse import observe
+
+from app.observability import (
+    RetrievalMetricsLogger,
+    trace_embedding,
+    trace_ticket_creation,
+    trace_vector_search,
+)
 
 
 @dataclass
@@ -15,22 +26,27 @@ class ToolResult:
     resolved: bool  # True = fully answered, False = needs escalation
 
 
+@observe(name="faq_lookup")
 def faq_lookup(intent: str, user_message: str) -> ToolResult:
     """Find the best matching FAQ article via vector similarity search."""
+    metrics = RetrievalMetricsLogger()
     try:
-        from app.embeddings import embed
-        from app.database import find_faq
+        with metrics.trace_latency("embedding"):
+            embedding = trace_embedding(user_message)
+        with metrics.trace_latency("vector_search"):
+            row = trace_vector_search(intent, embedding)
 
-        embedding = embed(user_message)
-        row = find_faq(intent, embedding)
+        hit = row is not None
+        metrics.score_hit(hit)
+        metrics.score_mrr(1 if hit else None)
 
-        if row:
+        if hit:
             return ToolResult(
                 success=True,
                 data=f"**{row['title']}**\n\n{row['content']}",
                 resolved=True,
             )
-    except Exception as exc:
+    except Exception:
         # DB unavailable — fall back to static responses
         pass
 
@@ -56,14 +72,16 @@ def faq_lookup(intent: str, user_message: str) -> ToolResult:
     return ToolResult(success=False, data="No matching FAQ article found.", resolved=False)
 
 
+@observe(name="ticket_lookup")
 def ticket_lookup(user_message: str) -> ToolResult:
     """Create a support ticket and return its ID."""
+    metrics = RetrievalMetricsLogger()
     try:
-        from app.embeddings import embed
-        from app.database import create_ticket
-
-        embedding = embed(user_message)
-        ticket_id = create_ticket(user_message, "escalation", embedding)
+        with metrics.trace_latency("embedding"):
+            embedding = trace_embedding(user_message)
+        with metrics.trace_latency("ticket_db_insert"):
+            ticket_id = trace_ticket_creation(user_message, "escalation", embedding)
+        metrics.score_ticket_created(True)
         return ToolResult(
             success=True,
             data=(
@@ -73,6 +91,7 @@ def ticket_lookup(user_message: str) -> ToolResult:
             resolved=True,
         )
     except Exception:
+        metrics.score_ticket_created(False)
         return ToolResult(
             success=True,
             data="A priority ticket has been created. A senior agent will contact you shortly.",
@@ -89,7 +108,13 @@ def run_tool(intent: str, user_message: str) -> ToolResult:
         "escalation": lambda i, m: ticket_lookup(m),
         "unknown": lambda i, m: ToolResult(
             success=False,
-            data="I couldn't determine what you need help with.",
+            data=(
+                "Hi! I'm the support assistant. I can help with:\n\n"
+                "• **Password & account access** — resets, locked accounts\n"
+                "• **Billing** — invoices, charges, refunds\n"
+                "• **Technical issues** — app errors, API problems\n\n"
+                "What can I help you with today?"
+            ),
             resolved=False,
         ),
     }

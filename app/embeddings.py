@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from langfuse import observe
+
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer as _ST
 
@@ -24,6 +26,7 @@ def _get_model() -> "_ST":
     return _model
 
 
+@observe(name="embed")
 def embed(text: str) -> list[float]:
     """Return a 384-dim embedding for text."""
     return _get_model().encode(text, convert_to_numpy=True).tolist()

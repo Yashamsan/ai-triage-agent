@@ -2,7 +2,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from langfuse import observe, propagate_attributes
 from pydantic import BaseModel
 
@@ -13,6 +18,12 @@ from app.security.input_sanitizer import InputSanitizer
 from app.security.output_filter import OutputFilter
 
 app = FastAPI(title="AI Triage Agent")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type"],
+)
 sanitizer = InputSanitizer()
 output_filter = OutputFilter()
 
@@ -98,3 +109,13 @@ def triage(request: TriageRequest):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Static UI ─────────────────────────────────────────────────────────
+_UI_DIR = Path(__file__).parent.parent / "ui"
+
+@app.get("/")
+def serve_ui():
+    return FileResponse(_UI_DIR / "index.html")
+
+app.mount("/ui", StaticFiles(directory=str(_UI_DIR)), name="ui")
