@@ -59,13 +59,11 @@ class TestRouting:
         state = {"intent": "password_reset"}
         assert route_after_classifier(state) == "reflect"
 
-    def test_route_after_reflection_unknown_skips_tools(self):
-        state = {"intent": "unknown"}
-        assert route_after_reflection(state) == "responder"
-
-    def test_route_after_reflection_known_goes_to_tools(self):
-        state = {"intent": "billing"}
-        assert route_after_reflection(state) == "tool_runner"
+    def test_route_after_reflection_always_tool_runner(self):
+        # All intents go through tool_runner — no shortcuts to responder
+        for intent in ("unknown", "billing", "greeting", "password_reset"):
+            state = {"intent": intent}
+            assert route_after_reflection(state) == "tool_runner"
 
     def test_route_after_tool_always_memory(self):
         state = {"resolved": True}
@@ -75,8 +73,13 @@ class TestRouting:
         state = {"needs_escalation": False, "resolved": True}
         assert route_after_memory(state) == "responder"
 
-    def test_route_after_memory_unresolved_escalates(self):
+    def test_route_after_memory_unresolved_not_flagged_goes_responder(self):
+        # unresolved but not escalation-flagged → responder (best-effort answer)
         state = {"needs_escalation": False, "resolved": False}
+        assert route_after_memory(state) == "responder"
+
+    def test_route_after_memory_escalation_flag_escalates(self):
+        state = {"needs_escalation": True, "resolved": False}
         assert route_after_memory(state) == "escalation"
 
 
