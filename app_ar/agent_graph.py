@@ -1,12 +1,12 @@
-"""LangGraph StateGraph for ai-triage-agent.
+"""Arabic LangGraph agent — 6-node StateGraph with memory, reflection, and precedent.
 
 Nodes: classifier → reflect → tool_runner → store_memory → responder/escalation
 
-MCP notes:
-  app/mcp_server.py + app/mcp_client.py expose the same tools over MCP stdio
-  for external integrations (IDE plugins, Claude Desktop).
-  tool_runner_node calls run_tool() synchronously; LangGraph runs sync nodes
-  in a thread pool when ainvoke() is used, so the event loop is never blocked.
+Mirrors app/agent_graph.py Week 7 architecture; Arabic-specific:
+  - classify_ar() for Qwen3.5 via OpenRouter
+  - app_ar.reflection for bilingual LLM-as-Judge (Arabic query, English intents)
+  - Arabic response formatting in responder/escalation nodes
+  - Shared memory and precedent_store (sessions prefixed ar_ in main.py)
 """
 
 from typing import Literal, Optional, TypedDict
@@ -15,12 +15,12 @@ from langfuse import observe
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 
-from app.classifier import classify
+from app_ar.classifier import classify_ar
+from app_ar.reflection import reflect as reflection_check
+from app_ar.response_generator import generate_response_ar
+from app_ar.tools import run_tool
 from app.memory import get_session
 from app.precedent_store import find_precedent, store_trace
-from app.reflection import reflect as reflection_check
-from app.response_generator import generate_response
-from app.tools import run_tool
 
 checkpointer = InMemorySaver()
 
@@ -52,11 +52,11 @@ class AgentState(TypedDict):
 
 # ── Nodes ─────────────────────────────────────────────────────────────────────
 
-@observe(name="classifier-node")
+@observe(name="classifier-node-ar")
 def classifier_node(state: AgentState) -> dict:
-    result = classify(state["message"])
+    result = classify_ar(state["message"])
 
-    session = get_session(state.get("session_id") or "default")
+    session = get_session(state.get("session_id") or "ar_default")
     session.add_turn("user", state["message"])
     session.current_intent = result.intent
     session.confidence = result.confidence
@@ -69,9 +69,9 @@ def classifier_node(state: AgentState) -> dict:
             lines = []
             for p in precedents:
                 decision = p.get("human_correction") or p.get("decision", "unknown")
-                reason = (p.get("reason") or "No reason recorded")[:100]
-                lines.append(f"- Previous similar case → {decision} ({reason})")
-            precedent_text = "## Relevant Precedents\n" + "\n".join(lines)
+                reason = (p.get("reason") or "لا يوجد سبب مسجل")[:100]
+                lines.append(f"- حالة مشابهة سابقة → {decision} ({reason})")
+            precedent_text = "## سوابق ذات صلة\n" + "\n".join(lines)
     except Exception:
         pass
 
@@ -84,7 +84,7 @@ def classifier_node(state: AgentState) -> dict:
     }
 
 
-@observe(name="reflect-node")
+@observe(name="reflect-node-ar")
 def reflection_node(state: AgentState) -> dict:
     if state["intent"] in ("greeting", "unknown"):
         return {
@@ -129,7 +129,7 @@ def reflection_node(state: AgentState) -> dict:
     }
 
 
-@observe(name="tool-runner-node")
+@observe(name="tool-runner-node-ar")
 def tool_runner_node(state: AgentState) -> dict:
     effective_intent = (
         state["revised_intent"] if state.get("needs_revision") else state["intent"]
@@ -141,7 +141,7 @@ def tool_runner_node(state: AgentState) -> dict:
     }
 
 
-@observe(name="store-memory-node")
+@observe(name="store-memory-node-ar")
 def store_memory_node(state: AgentState) -> dict:
     effective_intent = (
         state["revised_intent"] if state.get("needs_revision") else state["intent"]
@@ -164,33 +164,32 @@ def store_memory_node(state: AgentState) -> dict:
     try:
         store_trace(trace)
     except Exception as e:
-        print(f"[Memory] Failed to store precedent: {e}")
+        pass
 
-    session = get_session(state.get("session_id") or "default")
-    session.add_turn("assistant", f"Classified as: {effective_intent}")
+    session = get_session(state.get("session_id") or "ar_default")
+    session.add_turn("assistant", f"تم التصنيف كـ: {effective_intent}")
     session.escalation_level = 2 if state["needs_escalation"] else 1
 
     return {}
 
 
-_INTENT_LABELS = {
-    "greeting": "Support Assistant",
-    "password_reset": "Password Reset",
-    "billing": "Billing",
-    "technical_support": "Technical Support",
-    "escalation": "Escalation",
-    "unknown": "Support Assistant",
-}
-
-
-@observe(name="responder-node")
+@observe(name="responder-node-ar")
 def responder_node(state: AgentState) -> dict:
     effective_intent = (
         state["revised_intent"] if state.get("needs_revision") else state["intent"]
     )
-    label = _INTENT_LABELS.get(effective_intent, effective_intent.replace("_", " ").title())
 
-    generated = generate_response(
+    intent_labels = {
+        "greeting": "مرحباً",
+        "password_reset": "إعادة تعيين كلمة المرور",
+        "billing": "الفواتير والمدفوعات",
+        "technical_support": "الدعم التقني",
+        "escalation": "التصعيد",
+        "unknown": "غير محدد",
+    }
+    label = intent_labels.get(effective_intent, effective_intent)
+
+    generated = generate_response_ar(
         message=state["message"],
         intent=effective_intent,
         tool_output=state.get("tool_output", ""),
@@ -202,32 +201,43 @@ def responder_node(state: AgentState) -> dict:
 
     revision_note = ""
     if state.get("needs_revision") and state.get("critique"):
-        revision_note = f"\n\n*Reflection note: {state['critique']}*"
+        revision_note = f"\n\n*ملاحظة المراجع: {state['critique']}*"
 
     response = (
         f"**{label}**\n\n"
         f"{generated}\n\n"
         f"---\n"
-        f"Confidence: {state['revised_confidence']:.0%}"
+        f"الثقة: {state['revised_confidence']:.0%}"
         f"{revision_note}"
     )
     return {"response_text": response}
 
 
-@observe(name="escalation-node")
+@observe(name="escalation-node-ar")
 def escalation_node(state: AgentState) -> dict:
     effective_intent = (
         state["revised_intent"] if state.get("needs_revision") else state["intent"]
     )
+
+    intent_labels = {
+        "greeting": "مرحباً",
+        "password_reset": "إعادة تعيين كلمة المرور",
+        "billing": "الفواتير والمدفوعات",
+        "technical_support": "الدعم التقني",
+        "escalation": "التصعيد",
+        "unknown": "غير محدد",
+    }
+    label = intent_labels.get(effective_intent, effective_intent)
+
     response = (
-        f"**Escalation Required**\n\n"
-        f"**Intent:** {effective_intent.replace('_', ' ').title()}\n"
-        f"**Confidence:** {state['revised_confidence']:.0%}\n\n"
+        f"**يتطلب التصعيد**\n\n"
+        f"**النوع:** {label}\n"
+        f"**الثقة:** {state['revised_confidence']:.0%}\n\n"
         f"{state['tool_output']}\n\n"
-        f"---\nA senior support agent will follow up shortly."
+        f"---\nسيتواصل معك وكيل دعم أول قريباً."
     )
     if state.get("critique"):
-        response += f"\n\n*Reflection note: {state['critique']}*"
+        response += f"\n\n*ملاحظة المراجع: {state['critique']}*"
     return {"response_text": response}
 
 
@@ -250,9 +260,6 @@ def route_after_tool(state: AgentState) -> Literal["store_memory"]:
 def route_after_memory(
     state: AgentState,
 ) -> Literal["responder", "escalation"]:
-    # Only escalate when the classifier (or reflection) explicitly flagged it.
-    # Unresolved but non-escalated means the agent gave a best-effort answer
-    # (e.g. "unknown" guide message) — that goes to responder, not a human.
     if state["needs_escalation"]:
         return "escalation"
     return "responder"
@@ -296,4 +303,4 @@ def build_triage_agent() -> StateGraph:
 
 # ── Singleton ─────────────────────────────────────────────────────────────────
 
-triage_agent = build_triage_agent()
+triage_agent_ar = build_triage_agent()

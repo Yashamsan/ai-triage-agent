@@ -11,3 +11,4 @@ skills-lock.json
 htmlcov/
 .pytest_cache/
 .ruff_cache/
+audit_data/

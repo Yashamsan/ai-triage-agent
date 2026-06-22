@@ -84,6 +84,17 @@ services:
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"], interval: 3s, timeout: 3s, retries: 10}
     restart: unless-stopped
 
+  triage-db:
+    image: "docker.io/pgvector/pgvector:pg17"
+    ports: ["127.0.0.1:5432:5432"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: triage_agent
+    volumes: [triage_db_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres -d triage_agent"], interval: 3s, timeout: 3s, retries: 10}
+    restart: unless-stopped
+
 
   clickhouse:
     image: "docker.io/clickhouse/clickhouse-server:latest"
@@ -136,3 +147,4 @@ volumes:
   langfuse_clickhouse_logs:
   langfuse_minio_data:
   langfuse_redis_data:
+  triage_db_data:

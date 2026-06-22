@@ -47,10 +47,8 @@ def faq_lookup(intent: str, user_message: str) -> ToolResult:
                 resolved=True,
             )
     except Exception:
-        # DB unavailable — fall back to static responses
         pass
 
-    # Static fallback (used when DB is not yet seeded or unreachable)
     fallbacks = {
         "password_reset": (
             "To reset your password, visit the login page and click 'Forgot Password'. "
@@ -102,18 +100,29 @@ def ticket_lookup(user_message: str) -> ToolResult:
 def run_tool(intent: str, user_message: str) -> ToolResult:
     """Dispatch to the right tool based on classified intent."""
     tool_map = {
-        "password_reset": faq_lookup,
-        "billing": faq_lookup,
-        "technical_support": faq_lookup,
+        "greeting": lambda i, m: ToolResult(
+            success=True,
+            data=(
+                "Hello! How can I help you today?\n\n"
+                "I can assist with:\n\n"
+                "• **Password & account access** — resets, locked accounts\n"
+                "• **Billing** — invoices, charges, refunds\n"
+                "• **Technical issues** — app errors, API problems"
+            ),
+            resolved=True,
+        ),
+        "password_reset": lambda i, m: faq_lookup(i, m),
+        "billing": lambda i, m: faq_lookup(i, m),
+        "technical_support": lambda i, m: faq_lookup(i, m),
         "escalation": lambda i, m: ticket_lookup(m),
         "unknown": lambda i, m: ToolResult(
             success=False,
             data=(
-                "Hi! I'm the support assistant. I can help with:\n\n"
+                "I'm not sure I understood that. I can help with:\n\n"
                 "• **Password & account access** — resets, locked accounts\n"
                 "• **Billing** — invoices, charges, refunds\n"
                 "• **Technical issues** — app errors, API problems\n\n"
-                "What can I help you with today?"
+                "Could you describe your issue?"
             ),
             resolved=False,
         ),

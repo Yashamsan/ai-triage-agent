@@ -1,9 +1,4 @@
-"""DB connection + query functions.
-
-Connects to PostgreSQL via DATABASE_URL env var.
-All functions use a short-lived connection per call (no pool needed at
-this scale; swap in psycopg2.pool or asyncpg when load demands it).
-"""
+"""DB connection — same PostgreSQL, reusable for Arabic data."""
 
 import os
 from contextlib import contextmanager
@@ -23,17 +18,14 @@ DATABASE_URL = os.getenv(
 
 @contextmanager
 def get_conn():
-    conn = psycopg2.connect(DATABASE_URL, connect_timeout=3)
+    conn = psycopg2.connect(DATABASE_URL)
     try:
         yield conn
     finally:
         conn.close()
 
 
-# ── Schema ────────────────────────────────────────────────────────────
-
 def apply_schema() -> None:
-    """Run app/schema.sql against the database (idempotent — IF NOT EXISTS)."""
     sql = (Path(__file__).parent / "schema.sql").read_text()
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -41,10 +33,7 @@ def apply_schema() -> None:
         conn.commit()
 
 
-# ── FAQ queries ───────────────────────────────────────────────────────
-
 def find_faq(intent: str, embedding: list[float]) -> dict | None:
-    """Return the closest FAQ article for the given intent + embedding."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
@@ -74,10 +63,7 @@ def insert_faq(intent: str, title: str, content: str, embedding: list[float]) ->
         conn.commit()
 
 
-# ── Ticket queries ────────────────────────────────────────────────────
-
 def create_ticket(user_message: str, intent: str, embedding: list[float]) -> int:
-    """Insert a support ticket and return its id."""
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -94,7 +80,6 @@ def create_ticket(user_message: str, intent: str, embedding: list[float]) -> int
 
 
 def find_similar_tickets(embedding: list[float], limit: int = 3) -> list[dict]:
-    """Return the most similar open tickets by vector distance."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
@@ -109,8 +94,6 @@ def find_similar_tickets(embedding: list[float], limit: int = 3) -> list[dict]:
             )
             return cur.fetchall()
 
-
-# ── Conversation history ──────────────────────────────────────────────
 
 def save_message(session_id: str, role: str, message: str, intent: str | None = None) -> None:
     with get_conn() as conn:

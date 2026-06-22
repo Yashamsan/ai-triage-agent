@@ -7,3 +7,5 @@ langfuse>=4.7.1
 langgraph>=0.4.0
 psycopg2-binary>=2.9.9
 sentence-transformers>=3.0.0
+mcp>=1.0.0
+starlette==0.46.2
