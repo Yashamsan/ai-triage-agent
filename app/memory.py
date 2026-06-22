@@ -1,8 +1,7 @@
 """Session memory: tracks conversation history per session_id."""
 
-from dataclasses import dataclass, field
-from typing import Optional
 import time
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -23,8 +22,8 @@ class SessionMemory:
     """Tracks a single conversation session."""
     session_id: str
     turns: list[ConversationTurn] = field(default_factory=list)
-    current_intent: Optional[str] = None
-    escalation_level: Optional[int] = None
+    current_intent: str | None = None
+    escalation_level: int | None = None
     confidence: float = 0.0
 
     def add_turn(self, role: str, content: str, metadata: dict | None = None):

@@ -9,7 +9,7 @@ MCP notes:
   in a thread pool when ainvoke() is used, so the event loop is never blocked.
 """
 
-from typing import Literal, Optional, TypedDict
+from typing import Literal, TypedDict
 
 from langfuse import observe
 from langgraph.checkpoint.memory import InMemorySaver
@@ -30,16 +30,16 @@ checkpointer = InMemorySaver()
 class AgentState(TypedDict):
     # Input
     message: str
-    session_id: Optional[str]
+    session_id: str | None
     # Classifier output
     intent: str
     confidence: float
     needs_escalation: bool
     # Reflection output
     needs_revision: bool
-    revised_intent: Optional[str]
+    revised_intent: str | None
     revised_confidence: float
-    critique: Optional[str]
+    critique: str | None
     # Tool output
     tool_output: str
     resolved: bool

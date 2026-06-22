@@ -2,19 +2,18 @@
 
 import hashlib
 import json
-from typing import Optional
+import os
 
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from sentence_transformers import SentenceTransformer
-import os
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@localhost/triage_agent",
 )
 
-_model: Optional[SentenceTransformer] = None
+_model: SentenceTransformer | None = None
 
 
 def _get_model() -> SentenceTransformer:
@@ -35,7 +34,7 @@ def compute_pattern_hash(
     return hashlib.sha256(raw.lower().strip().encode()).hexdigest()
 
 
-def store_trace(trace: dict, human_correction: Optional[str] = None):
+def store_trace(trace: dict, human_correction: str | None = None):
     conn = _get_conn()
     register_vector(conn)
     cur = conn.cursor()

@@ -3,7 +3,6 @@
 import json
 import os
 import re
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -72,8 +71,8 @@ def reflect(
     confidence: float,
     context: str = "",
     reasoning: str = "",
-    model: Optional[str] = None,
-) -> Optional[dict]:
+    model: str | None = None,
+) -> dict | None:
     """
     Ask the LLM to review a triage classification.
 

@@ -5,8 +5,7 @@ Bridges live triage agent decisions into the pl_nodes/pl_edges graph.
 
 import json
 import os
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import psycopg2
 import psycopg2.extras
@@ -21,7 +20,7 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:postgres@localhost/triage_agent",
 )
 
-_model: Optional[SentenceTransformer] = None
+_model: SentenceTransformer | None = None
 
 
 def _get_model() -> SentenceTransformer:
@@ -56,7 +55,7 @@ def record_decision(
     snapshot_props = {
         "input_query": input_query[:500],
         "session_id": session_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     snapshot_embedding = _get_model().encode(input_query) if input_query else None
     cur.execute(

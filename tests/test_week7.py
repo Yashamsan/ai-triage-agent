@@ -1,14 +1,13 @@
 """Tests for Week 7 — Memory + Reflection."""
 
-import pytest
-from app.memory import get_session, clear_session, session_exists
 from app.agent_graph import (
     build_triage_agent,
     route_after_classifier,
+    route_after_memory,
     route_after_reflection,
     route_after_tool,
-    route_after_memory,
 )
+from app.memory import clear_session, get_session, session_exists
 
 
 class TestSessionMemory:

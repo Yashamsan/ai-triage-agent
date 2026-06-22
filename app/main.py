@@ -10,7 +10,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from audit import audit_record
 from langfuse import observe, propagate_attributes
 from langgraph.types import Command
 from pydantic import BaseModel
@@ -23,6 +22,7 @@ from app_ar.agent_graph import triage_agent_ar
 from app_ar.security.guard_classifier import guard_classify_ar
 from app_ar.security.input_sanitizer import InputSanitizer as ArInputSanitizer
 from app_ar.security.output_filter import OutputFilter as ArOutputFilter
+from audit import audit_record
 
 app = FastAPI(title="AI Triage Agent")
 app.add_middleware(
