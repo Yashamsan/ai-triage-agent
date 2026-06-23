@@ -41,6 +41,22 @@ def apply_schema() -> None:
         conn.commit()
 
 
+def apply_schema_v2() -> None:
+    """Run app/schema_v2.sql — pl_agents + full-text search trigger.
+
+    Safe to call repeatedly; all statements use IF NOT EXISTS / OR REPLACE.
+    No-op if schema_v2.sql is not present.
+    """
+    sql_path = Path(__file__).parent / "schema_v2.sql"
+    if not sql_path.exists():
+        return
+    sql = sql_path.read_text()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+
+
 # ── FAQ queries ───────────────────────────────────────────────────────
 
 def find_faq(intent: str, embedding: list[float]) -> dict | None:

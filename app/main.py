@@ -27,6 +27,15 @@ from audit import audit_record
 
 app = FastAPI(title="AI Triage Agent")
 app.include_router(prooflayer_router)
+
+
+@app.on_event("startup")
+def _migrate_schema_v2() -> None:
+    from app.database import apply_schema_v2
+    try:
+        apply_schema_v2()
+    except Exception as exc:
+        print(f"[startup] schema_v2 migration skipped: {exc}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
