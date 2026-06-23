@@ -15,6 +15,7 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.agent_graph import triage_agent
+from app.prooflayer_api import router as prooflayer_router
 from app.security.guard_classifier import guard_classify
 from app.security.input_sanitizer import InputSanitizer
 from app.security.output_filter import OutputFilter
@@ -25,6 +26,7 @@ from app_ar.security.output_filter import OutputFilter as ArOutputFilter
 from audit import audit_record
 
 app = FastAPI(title="AI Triage Agent")
+app.include_router(prooflayer_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -250,5 +252,11 @@ _UI_DIR = Path(__file__).parent.parent / "ui"
 @app.get("/")
 def serve_ui():
     return FileResponse(_UI_DIR / "index.html")
+
+
+@app.get("/admin")
+def serve_admin():
+    return FileResponse(_UI_DIR / "admin.html")
+
 
 app.mount("/ui", StaticFiles(directory=str(_UI_DIR)), name="ui")

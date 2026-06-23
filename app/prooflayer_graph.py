@@ -37,6 +37,9 @@ def _get_conn():
 # ── Insert ────────────────────────────────────────────────────────────
 
 
+_DEFAULT_MODEL_ID = os.getenv("DEFAULT_MODEL_ID", "deepseek/deepseek-chat")
+
+
 def record_decision(
     decision_value: str,
     confidence: float,
@@ -45,6 +48,8 @@ def record_decision(
     session_id: str = "",
     input_query: str = "",
     policy_ids: list[str] | None = None,
+    model_id: str | None = None,
+    agent_name: str | None = None,
 ) -> dict:
     """Record a Decision node + ContextSnapshot + edges to applied policies."""
     conn = _get_conn()
@@ -60,13 +65,14 @@ def record_decision(
     snapshot_embedding = _get_model().encode(input_query) if input_query else None
     cur.execute(
         """
-        INSERT INTO pl_nodes (node_type, properties, embedding)
-        VALUES ('ContextSnapshot', %s, %s::vector)
+        INSERT INTO pl_nodes (node_type, properties, embedding, agent_name)
+        VALUES ('ContextSnapshot', %s, %s::vector, %s)
         RETURNING node_id
         """,
         (
             json.dumps(snapshot_props),
             snapshot_embedding.tolist() if snapshot_embedding is not None else None,
+            agent_name,
         ),
     )
     snapshot_id = cur.fetchone()["node_id"]
@@ -78,15 +84,15 @@ def record_decision(
         "human_override": human_override,
         "reasoning_summary": reasoning_summary[:500],
         "session_id": session_id,
-        "model_id": "deepseek/deepseek-chat",
+        "model_id": model_id or _DEFAULT_MODEL_ID,
     }
     cur.execute(
         """
-        INSERT INTO pl_nodes (node_type, properties)
-        VALUES ('Decision', %s)
+        INSERT INTO pl_nodes (node_type, properties, agent_name)
+        VALUES ('Decision', %s, %s)
         RETURNING node_id
         """,
-        (json.dumps(decision_props),),
+        (json.dumps(decision_props), agent_name),
     )
     decision_id = cur.fetchone()["node_id"]
 
