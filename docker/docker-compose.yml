@@ -131,14 +131,29 @@ services:
     healthcheck: {test: ["CMD-SHELL", "redis-cli -a ${LANGFUSE_REDIS_AUTH} ping | grep -q PONG"], interval: 3s, timeout: 10s, retries: 10}
     restart: unless-stopped
 
+  triage-agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      triage-db:
+        condition: service_healthy
+    env_file: ../.env
+    environment:
+      # Override DATABASE_URL so the app talks to the triage-db container,
+      # not localhost (which doesn't exist inside Docker).
+      DATABASE_URL: "postgresql://postgres:postgres@triage-db:5432/triage_agent"
+    volumes:
+      - triage_audit_data:/home/appuser/app/audit_data
+    restart: unless-stopped
+
   # Reverse proxy — serves the chat UI + API on http://localhost:80
   nginx:
     image: "docker.io/nginx:alpine"
     ports: ["80:80"]
+    depends_on: [triage-agent]
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
 volumes:
@@ -148,3 +163,4 @@ volumes:
   langfuse_minio_data:
   langfuse_redis_data:
   triage_db_data:
+  triage_audit_data:

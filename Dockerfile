@@ -8,6 +8,8 @@ RUN useradd --create-home appuser
 WORKDIR /home/appuser/app
 COPY --from=builder /root/.local /home/appuser/.local
 COPY --chown=appuser:appuser app/ ./app/
+COPY --chown=appuser:appuser app_ar/ ./app_ar/
+COPY --chown=appuser:appuser audit/ ./audit/
 COPY --chown=appuser:appuser ui/ ./ui/
 ENV PATH="/home/appuser/.local/bin:$PATH"
 ENV PYTHONPATH="/home/appuser/app"
