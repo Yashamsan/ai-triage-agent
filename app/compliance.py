@@ -16,9 +16,10 @@ Status tiers:
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Callable
+from typing import Any
 
 import psycopg2
 import psycopg2.extras
@@ -1350,9 +1351,11 @@ def generate_iso_42001_report(agent_name: str | None = None) -> dict[str, Any]:
         score = _STATUS_SCORE.get(r["status"])
         if score is not None:
             if req.clause.startswith("Clause"):
-                core_ws += score * req.weight; core_wt += req.weight
+                core_ws += score * req.weight
+                core_wt += req.weight
             else:
-                annex_ws += score * req.weight; annex_wt += req.weight
+                annex_ws += score * req.weight
+                annex_wt += req.weight
 
     return {
         "standard": "ISO/IEC 42001:2023",
@@ -1388,9 +1391,11 @@ def generate_compliance_summary(agent_name: str | None = None) -> dict[str, Any]
             weighted_score += score * req.weight
             weighted_total += req.weight
             if req.clause.startswith("Clause"):
-                core_score += score * req.weight; core_total += req.weight
+                core_score += score * req.weight
+                core_total += req.weight
             else:
-                annex_score += score * req.weight; annex_total += req.weight
+                annex_score += score * req.weight
+                annex_total += req.weight
 
     overall_pct = round(weighted_score / weighted_total * 100, 1) if weighted_total else 0.0
     return {
@@ -1452,8 +1457,12 @@ def generate_remediation_checklist(agent_name: str | None = None) -> dict[str, A
 
 
 def _grade(pct: float) -> str:
-    if pct >= 90: return "A"
-    if pct >= 75: return "B"
-    if pct >= 60: return "C"
-    if pct >= 40: return "D"
+    if pct >= 90:
+        return "A"
+    if pct >= 75:
+        return "B"
+    if pct >= 60:
+        return "C"
+    if pct >= 40:
+        return "D"
     return "F"

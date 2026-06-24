@@ -16,21 +16,6 @@ from datetime import date
 
 from fpdf import FPDF
 
-# Helvetica (built-in) only covers latin-1.  Strip/replace anything outside it.
-def _safe(text: str, maxlen: int = 0) -> str:
-    text = (text
-            .replace("—", "--")   # em-dash
-            .replace("–", "-")    # en-dash
-            .replace("•", "*")    # bullet
-            .replace("’", "'")    # right single quote
-            .replace("“", '"')    # left double quote
-            .replace("”", '"'))   # right double quote
-    text = text.encode("latin-1", errors="replace").decode("latin-1")
-    if maxlen:
-        text = text[:maxlen]
-    return text
-
-
 from app.compliance import (
     MET,
     NOT_MET,
@@ -38,6 +23,22 @@ from app.compliance import (
     generate_iso_42001_report,
     generate_remediation_checklist,
 )
+
+
+# Helvetica (built-in) only covers latin-1.  Strip/replace anything outside it.
+def _safe(text: str, maxlen: int = 0) -> str:
+    text = (
+        text.replace(“—“, “--”)
+        .replace(“–“, “-”)
+        .replace(“•”, “*”)
+        .replace(“’”, “’”)
+        .replace(““”, ‘”’)
+        .replace(“””, ‘”’)
+    )
+    text = text.encode(“latin-1”, errors=”replace”).decode(“latin-1”)
+    if maxlen:
+        text = text[:maxlen]
+    return text
 
 # ── Brand colours (RGB) ───────────────────────────────────────────────────────
 C_PRIMARY = (10,  40,  80)
@@ -106,7 +107,6 @@ class CompliancePDF(FPDF):
 
         self.set_fill_color(*C_LIGHT)
         self.set_font("Helvetica", "B", 8)
-        y0 = self.get_y()
 
         # ID badge
         self.set_fill_color(*colour)
