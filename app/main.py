@@ -31,12 +31,18 @@ app.include_router(prooflayer_router)
 
 
 @app.on_event("startup")
-def _migrate_schema_v2() -> None:
+def _startup() -> None:
     from app.database import apply_schema_v2
     try:
         apply_schema_v2()
     except Exception as exc:
         print(f"[startup] schema_v2 migration skipped: {exc}")
+    try:
+        from app.embeddings import embed
+        embed("warmup")
+        print("[startup] embedding model pre-warmed")
+    except Exception as exc:
+        print(f"[startup] embedding warmup skipped: {exc}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

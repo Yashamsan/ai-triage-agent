@@ -101,6 +101,7 @@ Confidence: {confidence:.2f}
             ],
             temperature=0.1,
             max_tokens=500,
+            request_timeout=90,
             **extra_kwargs,
         )
         raw = response.choices[0].message.content

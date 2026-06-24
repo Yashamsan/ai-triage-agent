@@ -59,13 +59,19 @@ def classify(message: str) -> ClassifierOutput:
         {"role": "user", "content": safe_message},
     ]
 
-    llm_response = litellm.completion(
-        model=model,
-        messages=messages,
-        temperature=0,
-        **({"api_base": api_base} if api_base else {}),
-        **({"api_key": api_key} if api_key else {}),
-    )
+    try:
+        llm_response = litellm.completion(
+            model=model,
+            messages=messages,
+            temperature=0,
+            request_timeout=90,
+            **({"api_base": api_base} if api_base else {}),
+            **({"api_key": api_key} if api_key else {}),
+        )
+    except Exception as exc:
+        print(f"[Classifier] LLM call failed: {exc}")
+        return ClassifierOutput(intent="unknown", confidence=0.0, needs_escalation=False)
+
     raw = llm_response.choices[0].message.content
 
     try:
@@ -89,8 +95,13 @@ def classify(message: str) -> ClassifierOutput:
     except Exception:
         pass
 
-    data = json.loads(raw)
-    result = ClassifierOutput(**data)
+    try:
+        data = json.loads(raw)
+        result = ClassifierOutput(**data)
+    except Exception as exc:
+        print(f"[Classifier] Parse error: {exc}")
+        return ClassifierOutput(intent="unknown", confidence=0.0, needs_escalation=False)
+
     if result.intent not in VALID_INTENTS:
         result.intent = "unknown"
     return result
