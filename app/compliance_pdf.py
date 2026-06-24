@@ -25,16 +25,8 @@ from app.compliance import (
 )
 
 
-# Helvetica (built-in) only covers latin-1.  Strip/replace anything outside it.
 def _safe(text: str, maxlen: int = 0) -> str:
-    text = (
-        text.replace(“—“, “--”)
-        .replace(“–“, “-”)
-        .replace(“•”, “*”)
-        .replace(“’”, “’”)
-        .replace(““”, ‘”’)
-        .replace(“””, ‘”’)
-    )
+    “””Encode to latin-1, replacing any non-latin-1 character with ‘?’.”””
     text = text.encode(“latin-1”, errors=”replace”).decode(“latin-1”)
     if maxlen:
         text = text[:maxlen]
