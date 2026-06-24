@@ -39,8 +39,9 @@
     padding: 10px 20px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     flex-shrink: 0;
+    flex-wrap: wrap;
   }
   header h1 {
     font-size: 14px;
@@ -52,6 +53,7 @@
 
   #search-bar {
     flex: 1;
+    min-width: 160px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -74,11 +76,41 @@
     outline: none;
   }
 
-  #stats {
+  #compliance-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
     font-size: 11px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  #compliance-badge:hover { border-color: var(--accent); }
+  #compliance-badge .grade { font-weight: 700; font-size: 13px; }
+  .grade-A { color: var(--green); }
+  .grade-B { color: var(--accent); }
+  .grade-C { color: var(--yellow); }
+  .grade-D { color: var(--orange); }
+  .grade-F { color: var(--red); }
+
+  #stats { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  .icon-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
     color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
     white-space: nowrap;
   }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); }
 
   /* ── Main Layout ── */
   main {
@@ -89,7 +121,7 @@
 
   /* ── Left Panel — Decision List ── */
   #list-panel {
-    width: 340px;
+    width: 320px;
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     display: flex;
@@ -97,10 +129,7 @@
     overflow: hidden;
   }
 
-  #list-scroll {
-    overflow-y: auto;
-    flex: 1;
-  }
+  #list-scroll { overflow-y: auto; flex: 1; }
 
   .decision-item {
     border-bottom: 1px solid var(--border);
@@ -111,36 +140,11 @@
   .decision-item:hover { background: rgba(88,166,255,.05); }
   .decision-item.active { background: rgba(88,166,255,.12); border-left: 3px solid var(--accent); }
 
-  .di-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
-  }
-  .di-value {
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-  }
-  .di-conf {
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .di-input {
-    color: var(--muted);
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-bottom: 3px;
-  }
-  .di-meta {
-    font-size: 10px;
-    color: var(--muted);
-    display: flex;
-    gap: 8px;
-  }
+  .di-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .di-value { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .di-conf { font-size: 11px; color: var(--muted); }
+  .di-input { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .di-meta { font-size: 10px; color: var(--muted); display: flex; gap: 8px; }
   .di-agent { color: var(--purple); }
 
   /* Outcome colours */
@@ -149,13 +153,8 @@
   .val-pending { color: var(--yellow); }
   .val-default { color: var(--orange); }
 
-  /* ── Right Panel — Detail ── */
-  #detail-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+  /* ── Right Panel ── */
+  #detail-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
   #empty-state {
     flex: 1;
@@ -168,49 +167,18 @@
   }
   #empty-state .icon { font-size: 40px; opacity: .3; }
 
-  #detail-content {
-    flex: 1;
-    overflow-y: auto;
-    display: none;
-    flex-direction: column;
-  }
+  #detail-content { flex: 1; overflow-y: auto; display: none; flex-direction: column; }
 
-  /* Detail top bar */
-  #detail-header {
-    padding: 14px 20px 0;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .dh-top {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-  .dh-id {
-    font-family: monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .dh-value {
-    font-size: 18px;
-    font-weight: 700;
-  }
-  .dh-meta {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
-  }
+  /* Detail header */
+  #detail-header { padding: 14px 20px 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .dh-top { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .dh-id { font-family: monospace; font-size: 11px; color: var(--muted); }
+  .dh-value { font-size: 18px; font-weight: 700; }
+  .dh-meta { font-size: 11px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
   .dh-meta span { display: flex; align-items: center; gap: 4px; }
 
-  /* Tab bar */
-  .tabs {
-    display: flex;
-    gap: 2px;
-  }
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; overflow-x: auto; }
   .tab-btn {
     background: none;
     border: none;
@@ -221,6 +189,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: color .15s, border-color .15s;
+    white-space: nowrap;
   }
   .tab-btn:hover { color: var(--text); }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
@@ -249,7 +218,7 @@
     gap: 6px;
   }
 
-  /* Key-value grid */
+  /* KV grid */
   .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 12px; }
   .kv dt { color: var(--muted); }
   .kv dd { color: var(--text); word-break: break-all; }
@@ -263,14 +232,11 @@
     padding: 2px 10px;
     font-size: 11px;
     color: var(--accent);
-    display: flex;
-    align-items: center;
-    gap: 4px;
   }
-  .policy-pill.followed::after { content: '✓'; color: var(--green); }
-  .policy-pill.override::after { content: '⚠'; color: var(--yellow); }
+  .policy-pill.followed::after { content: ' ✓'; color: var(--green); }
+  .policy-pill.override::after { content: ' ⚠'; color: var(--yellow); }
 
-  /* Chain integrity badge */
+  /* Chain badge */
   .badge {
     display: inline-flex;
     align-items: center;
@@ -280,8 +246,8 @@
     font-size: 11px;
     font-weight: 600;
   }
-  .badge.intact { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.3); }
-  .badge.broken { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+  .badge.intact   { background: rgba(63,185,80,.15);  color: var(--green);  border: 1px solid rgba(63,185,80,.3); }
+  .badge.broken   { background: rgba(248,81,73,.15);  color: var(--red);    border: 1px solid rgba(248,81,73,.3); }
   .badge.unavailable { background: rgba(139,148,158,.1); color: var(--muted); border: 1px solid var(--border); }
 
   /* Blame factors */
@@ -295,36 +261,17 @@
     align-items: flex-start;
   }
   .factor-card.primary { border-color: var(--orange); background: rgba(255,166,87,.05); }
-  .factor-weight {
-    min-width: 40px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--orange);
-    text-align: right;
-  }
-  .factor-name {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    color: var(--text);
-    margin-bottom: 3px;
-  }
+  .factor-weight { min-width: 40px; font-size: 11px; font-weight: 700; color: var(--orange); text-align: right; }
+  .factor-name { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text); margin-bottom: 3px; }
   .factor-name.low_confidence { color: var(--yellow); }
-  .factor-name.model_change { color: var(--purple); }
-  .factor-name.policy_change { color: var(--orange); }
+  .factor-name.model_change   { color: var(--purple); }
+  .factor-name.policy_change  { color: var(--orange); }
   .factor-name.human_override { color: var(--red); }
-  .factor-name.context_shift { color: var(--accent); }
+  .factor-name.context_shift  { color: var(--accent); }
   .factor-explanation { font-size: 11px; color: var(--muted); line-height: 1.5; }
 
-  /* Diff view */
-  .diff-controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-  }
+  /* Diff */
+  .diff-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
   .diff-controls input {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -351,72 +298,153 @@
     white-space: nowrap;
   }
   .btn:hover { opacity: .85; }
-  .btn.secondary {
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
+  .btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 
   .diff-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .diff-table th {
-    text-align: left;
-    padding: 6px 10px;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-  }
+  .diff-table th { text-align: left; padding: 6px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); }
   .diff-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
   .diff-table tr:last-child td { border-bottom: none; }
   .diff-removed { color: var(--red); text-decoration: line-through; }
-  .diff-added { color: var(--green); }
+  .diff-added   { color: var(--green); }
   .diff-unchanged { color: var(--muted); }
 
   /* Timeline */
   .timeline { position: relative; padding-left: 18px; }
-  .timeline::before {
-    content: '';
-    position: absolute;
-    left: 5px; top: 4px; bottom: 4px;
-    width: 2px;
-    background: var(--border);
-  }
-  .tl-item {
-    position: relative;
-    margin-bottom: 12px;
-    font-size: 11px;
-  }
-  .tl-item::before {
-    content: '';
-    position: absolute;
-    left: -17px; top: 4px;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--border);
-    border: 2px solid var(--bg);
-  }
-  .tl-item.USED_CONTEXT::before { background: var(--accent); }
+  .timeline::before { content: ''; position: absolute; left: 5px; top: 4px; bottom: 4px; width: 2px; background: var(--border); }
+  .tl-item { position: relative; margin-bottom: 12px; font-size: 11px; }
+  .tl-item::before { content: ''; position: absolute; left: -17px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--border); border: 2px solid var(--bg); }
+  .tl-item.USED_CONTEXT::before   { background: var(--accent); }
   .tl-item.APPLIED_POLICY::before { background: var(--green); }
-  .tl-item.OVERTURNED_BY::before { background: var(--red); }
+  .tl-item.OVERTURNED_BY::before  { background: var(--red); }
   .tl-edge { font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: .05em; }
   .tl-node { color: var(--text); margin-top: 2px; }
 
+  /* ── Compliance tab ── */
+  #tab-compliance { padding: 0; }
+
+  .comp-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .comp-score-circle {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--border);
+    flex-shrink: 0;
+  }
+  .comp-score-circle .score-pct { font-size: 18px; font-weight: 700; line-height: 1; }
+  .comp-score-circle .score-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+  .comp-kpis { display: flex; gap: 20px; flex-wrap: wrap; }
+  .comp-kpi { display: flex; flex-direction: column; gap: 2px; }
+  .comp-kpi .kpi-val { font-size: 18px; font-weight: 700; }
+  .comp-kpi .kpi-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+  .comp-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .comp-body { padding: 16px 20px; overflow-y: auto; }
+
+  /* Section bars */
+  .section-group { margin-bottom: 18px; }
+  .section-group-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .section-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background .1s;
+  }
+  .section-bar:hover { background: rgba(88,166,255,.06); }
+  .section-bar.expanded { background: rgba(88,166,255,.08); }
+  .section-name { width: 200px; font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+  .bar-fill.score-high { background: var(--green); }
+  .bar-fill.score-mid  { background: var(--yellow); }
+  .bar-fill.score-low  { background: var(--red); }
+  .bar-fill.score-zero { background: var(--border); width: 0 !important; }
+  .section-pct { width: 36px; text-align: right; font-size: 11px; font-weight: 600; }
+
+  /* Requirement list (expanded) */
+  .req-list { display: none; margin: 4px 0 10px 6px; border-left: 2px solid var(--border); padding-left: 12px; }
+  .req-list.open { display: block; }
+  .req-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(48,54,61,.6);
+    display: grid;
+    grid-template-columns: 56px 1fr 90px;
+    gap: 8px;
+    align-items: start;
+    font-size: 11px;
+  }
+  .req-item:last-child { border-bottom: none; }
+  .req-id { font-family: monospace; color: var(--muted); font-size: 10px; padding-top: 1px; }
+  .req-title { color: var(--text); font-weight: 500; }
+  .req-evidence { color: var(--muted); font-size: 10px; margin-top: 3px; line-height: 1.4; }
+  .req-rec { color: var(--yellow); font-size: 10px; margin-top: 3px; line-height: 1.4; }
+  .req-status-pill {
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    align-self: start;
+  }
+  .status-MET          { background: rgba(63,185,80,.15);   color: var(--green);  border: 1px solid rgba(63,185,80,.3); }
+  .status-PARTIAL      { background: rgba(210,153,34,.12);  color: var(--yellow); border: 1px solid rgba(210,153,34,.3); }
+  .status-NOT_MET      { background: rgba(248,81,73,.12);   color: var(--red);    border: 1px solid rgba(248,81,73,.3); }
+  .status-NOT_APPLICABLE { background: rgba(139,148,158,.1); color: var(--muted); border: 1px solid var(--border); }
+
   /* Loading/error */
-  .loading { color: var(--muted); font-size: 12px; padding: 20px 0; text-align: center; }
+  .loading   { color: var(--muted); font-size: 12px; padding: 20px 0; text-align: center; }
   .error-msg { color: var(--red); font-size: 12px; padding: 10px; background: rgba(248,81,73,.1); border-radius: 6px; border: 1px solid rgba(248,81,73,.3); }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Print styles */
+  @media print {
+    body { background: white; color: black; font-size: 11px; height: auto; overflow: visible; }
+    header, #list-panel, .tabs, .comp-actions { display: none !important; }
+    #detail-panel { width: 100%; }
+    #detail-content { display: flex !important; overflow: visible; }
+    .tab-panel { display: block !important; }
+    main { overflow: visible; }
+    .card, .comp-header, .comp-body { background: white; border-color: #ccc; }
+    :root { --text: black; --muted: #555; --bg: white; --surface: white; --border: #ddd; }
+    .req-list { display: block !important; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Proof<span>Layer</span> Decision Explorer</h1>
-  <input id="search-bar" type="search" placeholder="Search decisions — try 'rejected' or 'billing' or a session ID…" />
+  <h1>Proof<span>Layer</span></h1>
+  <input id="search-bar" type="search" placeholder="Search decisions…" />
+  <select class="filter" id="filter-agent"><option value="">All agents</option></select>
   <select class="filter" id="filter-days">
     <option value="7">Last 7 days</option>
     <option value="30" selected>Last 30 days</option>
@@ -430,6 +458,10 @@
     <option value="escalation">Escalation</option>
     <option value="resolved">Resolved</option>
   </select>
+  <div id="compliance-badge" title="ISO 42001 Compliance Score — click to open Compliance tab">
+    🔐 ISO 42001 <span class="grade grade-F" id="badge-grade">—</span> <span id="badge-pct" style="color:var(--muted)">—</span>
+  </div>
+  <button class="icon-btn" onclick="loadList()">↻ Refresh</button>
   <span id="stats">—</span>
 </header>
 
@@ -437,7 +469,7 @@
   <!-- Left: decision list -->
   <div id="list-panel">
     <div id="list-scroll">
-      <div class="loading">Enter a search or select a filter above…</div>
+      <div class="loading">Loading decisions…</div>
     </div>
   </div>
 
@@ -446,7 +478,9 @@
     <div id="empty-state">
       <div class="icon">⊞</div>
       <div>Select a decision to inspect</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">or click 🔐 to view ISO 42001 compliance</div>
     </div>
+
     <div id="detail-content">
       <div id="detail-header">
         <div class="dh-top">
@@ -462,6 +496,7 @@
           <button class="tab-btn" data-tab="blame">Blame</button>
           <button class="tab-btn" data-tab="diff">Diff</button>
           <button class="tab-btn" data-tab="timeline">Timeline</button>
+          <button class="tab-btn" data-tab="compliance">🔐 Compliance</button>
         </div>
       </div>
 
@@ -483,7 +518,7 @@
         <div id="replay-content" style="display:none">
           <div class="card">
             <div class="card-title">Input</div>
-            <div id="rp-input" style="font-size:13px; line-height:1.6; color:var(--text)"></div>
+            <div id="rp-input" style="font-size:13px;line-height:1.6;color:var(--text)"></div>
           </div>
           <div class="card">
             <div class="card-title">Decision Output</div>
@@ -541,14 +576,67 @@
           <div class="timeline" id="tl-content"></div>
         </div>
       </div>
-    </div>
-  </div>
+
+      <!-- Compliance -->
+      <div class="tab-panel" id="tab-compliance">
+        <div id="comp-loading" class="loading" style="padding:40px 0">Running ISO 42001 gap analysis…</div>
+        <div id="comp-content" style="display:none">
+          <div class="comp-header">
+            <div class="comp-score-circle" id="comp-circle">
+              <span class="score-pct" id="comp-pct">—</span>
+              <span class="score-lbl">Score</span>
+            </div>
+            <div class="comp-kpis">
+              <div class="comp-kpi">
+                <span class="kpi-val grade-A" id="kpi-met">—</span>
+                <span class="kpi-lbl">Met</span>
+              </div>
+              <div class="comp-kpi">
+                <span class="kpi-val grade-C" id="kpi-partial">—</span>
+                <span class="kpi-lbl">Partial</span>
+              </div>
+              <div class="comp-kpi">
+                <span class="kpi-val grade-F" id="kpi-not-met">—</span>
+                <span class="kpi-lbl">Not Met</span>
+              </div>
+              <div class="comp-kpi">
+                <span class="kpi-val" style="color:var(--muted)" id="kpi-na">—</span>
+                <span class="kpi-lbl">N/A</span>
+              </div>
+              <div class="comp-kpi">
+                <span class="kpi-val" style="color:var(--accent)" id="kpi-core">—%</span>
+                <span class="kpi-lbl">Core Clauses</span>
+              </div>
+              <div class="comp-kpi">
+                <span class="kpi-val" style="color:var(--purple)" id="kpi-annex">—%</span>
+                <span class="kpi-lbl">Annex A</span>
+              </div>
+            </div>
+            <div class="comp-actions">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <label style="font-size:11px;color:var(--muted);white-space:nowrap">Agent filter:</label>
+                <select id="comp-agent-filter" onchange="loadCompliance()" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                  <option value="">All Agents</option>
+                </select>
+              </div>
+              <button class="btn secondary" onclick="loadCompliance()">↻ Re-run</button>
+              <a id="comp-pdf-link" class="btn secondary" href="/api/v1/compliance/report.pdf" target="_blank" style="text-decoration:none;display:inline-block">⬇ Export PDF</a>
+            </div>
+          </div>
+          <div class="comp-body" id="comp-body"></div>
+          <div id="comp-remediation" style="display:none;margin-top:16px"></div>
+        </div>
+      </div>
+
+    </div><!-- /detail-content -->
+  </div><!-- /detail-panel -->
 </main>
 
 <script>
-const API = '';  // same-origin
+const API = '';
 let currentId = null;
 let searchTimeout = null;
+let complianceLoaded = false;
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
@@ -560,22 +648,12 @@ function outcomeClass(val) {
   if (v === 'pending') return 'val-pending';
   return 'val-default';
 }
-
-function fmtConf(c) {
-  return `${Math.round(c * 100)}%`;
-}
-
+function fmtConf(c) { return `${Math.round((c || 0) * 100)}%`; }
 function fmtTime(ts) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  return new Date(ts).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
 }
-
-function shortId(id) {
-  return id ? id.substring(0, 8) + '…' : '—';
-}
+function shortId(id) { return id ? id.substring(0,8)+'…' : '—'; }
 
 async function apiFetch(path) {
   const res = await fetch(API + path);
@@ -589,13 +667,15 @@ async function apiFetch(path) {
 // ── Search / List ──────────────────────────────────────────────────────────
 
 async function loadList() {
-  const q = document.getElementById('search-bar').value.trim();
-  const days = document.getElementById('filter-days').value;
-  const val = document.getElementById('filter-value').value;
+  const q     = document.getElementById('search-bar').value.trim();
+  const days  = document.getElementById('filter-days').value;
+  const val   = document.getElementById('filter-value').value;
+  const agent = document.getElementById('filter-agent').value;
 
   const params = new URLSearchParams({ since_days: days, limit: 100 });
-  if (q) params.set('q', q);
-  if (val) params.set('decision_value', val);
+  if (q)     params.set('q', q);
+  if (val)   params.set('decision_value', val);
+  if (agent) params.set('agent_name', agent);
 
   const scroll = document.getElementById('list-scroll');
   scroll.innerHTML = '<div class="loading">Loading…</div>';
@@ -604,7 +684,7 @@ async function loadList() {
     const decisions = await apiFetch(`/api/v1/decisions?${params}`);
     document.getElementById('stats').textContent = `${decisions.length} decisions`;
     renderList(decisions);
-  } catch (e) {
+  } catch(e) {
     scroll.innerHTML = `<div class="error-msg">${e.message}</div>`;
   }
 }
@@ -624,7 +704,7 @@ function renderList(decisions) {
       </div>
       <div class="di-input">${d.session_id || 'no session'}</div>
       <div class="di-meta">
-        <span class="di-agent">${d.agent_name || 'unknown agent'}</span>
+        <span class="di-agent">${d.agent_name || 'unknown'}</span>
         <span>${fmtTime(d.timestamp)}</span>
         ${d.human_override ? '<span style="color:var(--red)">⚠ override</span>' : ''}
       </div>
@@ -635,27 +715,23 @@ function renderList(decisions) {
 // ── Decision Detail ────────────────────────────────────────────────────────
 
 async function selectDecision(id, el) {
-  // Mark active
   document.querySelectorAll('.decision-item').forEach(e => e.classList.remove('active'));
   if (el) el.classList.add('active');
 
   currentId = id;
-
   document.getElementById('empty-state').style.display = 'none';
   const content = document.getElementById('detail-content');
   content.style.display = 'flex';
 
-  // Reset tabs to Overview
   switchTab('overview');
-
-  // Update diff left-id label
   document.getElementById('diff-left-id').textContent = id;
 
   try {
     const d = await apiFetch(`/api/v1/decisions/${id}`);
     renderOverview(d);
-  } catch (e) {
-    document.getElementById('ov-props').innerHTML = `<dd class="error-msg" style="grid-column:1/-1">${e.message}</dd>`;
+  } catch(e) {
+    document.getElementById('ov-props').innerHTML =
+      `<dd class="error-msg" style="grid-column:1/-1">${e.message}</dd>`;
   }
 }
 
@@ -668,31 +744,28 @@ function renderOverview(d) {
 
   document.getElementById('dh-meta').innerHTML = [
     d.agent_name ? `<span>🤖 <span class="di-agent">${d.agent_name}</span></span>` : '',
-    p.model_id ? `<span>⚙ ${p.model_id}</span>` : '',
+    p.model_id   ? `<span>⚙ ${p.model_id}</span>` : '',
     `<span>⏱ ${fmtTime(d.timestamp)}</span>`,
     `<span>Confidence: ${fmtConf(p.confidence_score || 0)}</span>`,
     p.human_override ? `<span style="color:var(--red)">⚠ Human Override</span>` : '',
     p.session_id ? `<span style="font-family:monospace;font-size:10px">session: ${p.session_id}</span>` : '',
   ].filter(Boolean).join('');
 
-  // Properties card
   document.getElementById('ov-props').innerHTML = Object.entries(p)
     .filter(([k]) => !['decision_value','confidence_score','human_override'].includes(k))
     .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`)
     .join('');
 
-  // Timeline → policies
   const policies = (d.timeline || []).filter(t => t.edge_type === 'APPLIED_POLICY');
   if (policies.length) {
     document.getElementById('ov-policies-card').style.display = '';
     document.getElementById('ov-policies').innerHTML = policies.map(t => {
-      const pp = t.node_properties || {};
+      const pp  = t.node_properties || {};
       const app = (t.edge_properties || {}).application_type || 'followed';
-      return `<span class="policy-pill ${app}">${pp.policy_id || pp.name || 'policy'} v${pp.version || '?'}</span>`;
+      return `<span class="policy-pill ${app}">${pp.policy_id || pp.name || 'policy'} v${pp.policy_version || '?'}</span>`;
     }).join('');
   }
 
-  // Populate timeline tab
   renderTimeline(d.timeline || []);
 }
 
@@ -704,7 +777,7 @@ function renderTimeline(timeline) {
   document.getElementById('tl-content').innerHTML = timeline.map(t => `
     <div class="tl-item ${t.edge_type}">
       <div class="tl-edge">${t.edge_type} → ${t.connected_node_type}</div>
-      <div class="tl-node">${JSON.stringify(t.node_properties, null, 0).substring(0, 120)}…</div>
+      <div class="tl-node">${JSON.stringify(t.node_properties, null, 0).substring(0,120)}…</div>
       <div style="font-size:10px;color:var(--muted);margin-top:2px">${fmtTime(t.at)}</div>
     </div>
   `).join('');
@@ -716,11 +789,10 @@ async function loadReplay() {
   if (!currentId) return;
   document.getElementById('replay-loading').style.display = '';
   document.getElementById('replay-content').style.display = 'none';
-
   try {
     const r = await apiFetch(`/api/v1/decisions/${currentId}/replay`);
     renderReplay(r);
-  } catch (e) {
+  } catch(e) {
     document.getElementById('replay-loading').textContent = e.message;
     document.getElementById('replay-loading').style.color = 'var(--red)';
   }
@@ -729,33 +801,29 @@ async function loadReplay() {
 function renderReplay(r) {
   document.getElementById('replay-loading').style.display = 'none';
   document.getElementById('replay-content').style.display = '';
-
   document.getElementById('rp-input').textContent = r.input || '(no input recorded)';
-
   document.getElementById('rp-output').innerHTML = [
-    `<dt>Output</dt><dd class="${outcomeClass(r.output)}" style="font-weight:700">${r.output || '—'}</dd>`,
+    `<dt>Output</dt><dd class="${outcomeClass(r.output)}" style="font-weight:700">${r.output||'—'}</dd>`,
     `<dt>Confidence</dt><dd>${fmtConf(r.confidence)}</dd>`,
-    `<dt>Model</dt><dd>${r.model || '—'}</dd>`,
-    `<dt>Agent</dt><dd class="di-agent">${r.agent_name || '—'}</dd>`,
-    `<dt>Session</dt><dd style="font-family:monospace;font-size:11px">${r.session_id || '—'}</dd>`,
+    `<dt>Model</dt><dd>${r.model||'—'}</dd>`,
+    `<dt>Agent</dt><dd class="di-agent">${r.agent_name||'—'}</dd>`,
+    `<dt>Session</dt><dd style="font-family:monospace;font-size:11px">${r.session_id||'—'}</dd>`,
     r.human_override ? `<dt>Override</dt><dd style="color:var(--red)">Human override applied</dd>` : '',
     r.reasoning ? `<dt>Reasoning</dt><dd>${r.reasoning}</dd>` : '',
   ].filter(Boolean).join('');
 
-  // Policies
   if (r.policies && r.policies.length) {
     document.getElementById('rp-policies-card').style.display = '';
     document.getElementById('rp-policies').innerHTML = r.policies.map(p =>
-      `<span class="policy-pill ${p.application_type || 'followed'}">${p.name || p.policy_id}</span>`
+      `<span class="policy-pill ${p.application_type||'followed'}">${p.name||p.policy_id}</span>`
     ).join('');
   }
 
-  // Chain integrity
   const ev = r.evidence || {};
   let badgeClass = 'unavailable', badgeIcon = '?', badgeLabel = 'Unavailable';
-  if (ev.status === 'INTACT') { badgeClass = 'intact'; badgeIcon = '✓'; badgeLabel = 'Chain INTACT'; }
-  else if (ev.status === 'BROKEN') { badgeClass = 'broken'; badgeIcon = '✗'; badgeLabel = 'Chain BROKEN'; }
-  else if (ev.status === 'NO_RECORDS') { badgeClass = 'unavailable'; badgeIcon = '○'; badgeLabel = 'No Records'; }
+  if (ev.status === 'INTACT')     { badgeClass = 'intact';      badgeIcon = '✓'; badgeLabel = 'Chain INTACT'; }
+  else if (ev.status === 'BROKEN'){ badgeClass = 'broken';      badgeIcon = '✗'; badgeLabel = 'Chain BROKEN'; }
+  else if (ev.status === 'NO_RECORDS'){ badgeClass='unavailable'; badgeIcon='○'; badgeLabel='No Records'; }
 
   document.getElementById('rp-chain').innerHTML =
     `<span class="badge ${badgeClass}">${badgeIcon} ${badgeLabel}</span>` +
@@ -769,11 +837,10 @@ async function loadBlame() {
   if (!currentId) return;
   document.getElementById('blame-loading').style.display = '';
   document.getElementById('blame-content').style.display = 'none';
-
   try {
     const b = await apiFetch(`/api/v1/decisions/${currentId}/blame`);
     renderBlame(b);
-  } catch (e) {
+  } catch(e) {
     document.getElementById('blame-loading').textContent = e.message;
     document.getElementById('blame-loading').style.color = 'var(--red)';
   }
@@ -782,42 +849,39 @@ async function loadBlame() {
 function renderBlame(b) {
   document.getElementById('blame-loading').style.display = 'none';
   document.getElementById('blame-content').style.display = '';
-
   const rc = b.root_cause || {};
   document.getElementById('bl-root').innerHTML = `
     <div class="factor-card primary">
-      <div class="factor-weight">${Math.round((rc.weight || 0) * 100)}%</div>
+      <div class="factor-weight">${Math.round((rc.weight||0)*100)}%</div>
       <div>
-        <div class="factor-name ${rc.factor}">${(rc.factor || 'unknown').replace(/_/g,' ').toUpperCase()}</div>
-        <div class="factor-explanation">${rc.explanation || '—'}</div>
+        <div class="factor-name ${rc.factor}">${(rc.factor||'unknown').replace(/_/g,' ').toUpperCase()}</div>
+        <div class="factor-explanation">${rc.explanation||'—'}</div>
         ${rc.from ? `<div style="margin-top:6px;font-size:11px;color:var(--muted)">
           <span class="diff-removed">${rc.from}</span> → <span class="diff-added">${rc.to}</span>
         </div>` : ''}
       </div>
-    </div>
-  `;
+    </div>`;
 
   const comp = b.comparable_decision;
   if (comp) {
     document.getElementById('bl-comparable-card').style.display = '';
     document.getElementById('bl-comparable').innerHTML = [
       `<dt>Decision ID</dt><dd style="font-family:monospace;font-size:11px">${comp.decision_id}</dd>`,
-      `<dt>Output</dt><dd class="${outcomeClass(comp.decision_value)}">${comp.decision_value || '—'}</dd>`,
-      `<dt>Model</dt><dd>${comp.model_id || '—'}</dd>`,
+      `<dt>Output</dt><dd class="${outcomeClass(comp.decision_value)}">${comp.decision_value||'—'}</dd>`,
+      `<dt>Model</dt><dd>${comp.model_id||'—'}</dd>`,
       `<dt>Confidence</dt><dd>${fmtConf(comp.confidence)}</dd>`,
-      `<dt>Context Similarity</dt><dd>${comp.context_similarity != null ? Math.round(comp.context_similarity*100)+'%' : '—'}</dd>`,
+      `<dt>Context Similarity</dt><dd>${comp.context_similarity!=null ? Math.round(comp.context_similarity*100)+'%' : '—'}</dd>`,
     ].join('');
   }
 
-  document.getElementById('bl-factors').innerHTML = (b.all_factors || []).map((f, i) => `
-    <div class="factor-card${i === 0 ? ' primary' : ''}">
-      <div class="factor-weight">${Math.round((f.weight || 0) * 100)}%</div>
+  document.getElementById('bl-factors').innerHTML = (b.all_factors||[]).map((f,i) => `
+    <div class="factor-card${i===0?' primary':''}">
+      <div class="factor-weight">${Math.round((f.weight||0)*100)}%</div>
       <div>
-        <div class="factor-name ${f.factor}">${(f.factor || '').replace(/_/g,' ').toUpperCase()}</div>
-        <div class="factor-explanation">${f.explanation || '—'}</div>
+        <div class="factor-name ${f.factor}">${(f.factor||'').replace(/_/g,' ').toUpperCase()}</div>
+        <div class="factor-explanation">${f.explanation||'—'}</div>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 // ── Diff ───────────────────────────────────────────────────────────────────
@@ -826,14 +890,12 @@ async function runDiff() {
   const right = document.getElementById('diff-right-input').value.trim();
   if (!right) { alert('Paste a decision UUID to compare against.'); return; }
   if (!currentId) { alert('Select a decision first.'); return; }
-
   const result = document.getElementById('diff-result');
   result.innerHTML = '<div class="loading">Comparing…</div>';
-
   try {
     const d = await apiFetch(`/api/v1/decisions/diff?left=${currentId}&right=${right}`);
     renderDiff(d);
-  } catch (e) {
+  } catch(e) {
     result.innerHTML = `<div class="error-msg">${e.message}</div>`;
   }
 }
@@ -841,84 +903,276 @@ async function runDiff() {
 function renderDiff(d) {
   const changes = d.changes || {};
   const rows = [];
-
-  if (changes.output) {
-    rows.push(['Output', changes.output.left, changes.output.right]);
-  }
-  if (changes.model) {
-    rows.push(['Model', changes.model.left, changes.model.right]);
-  }
+  if (changes.output)    rows.push(['Output',     changes.output.left,    changes.output.right]);
+  if (changes.model)     rows.push(['Model',      changes.model.left,     changes.model.right]);
   if (changes.confidence) {
     const delta = changes.confidence.delta > 0 ? `+${changes.confidence.delta}` : changes.confidence.delta;
-    rows.push(['Confidence',
-      `${fmtConf(changes.confidence.left)}`,
-      `${fmtConf(changes.confidence.right)} (${delta})`
-    ]);
+    rows.push(['Confidence', fmtConf(changes.confidence.left), `${fmtConf(changes.confidence.right)} (${delta})`]);
   }
-  if (changes.agent) {
-    rows.push(['Agent', changes.agent.left, changes.agent.right]);
-  }
+  if (changes.agent)     rows.push(['Agent', changes.agent.left, changes.agent.right]);
   if (changes.policies) {
     const pp = changes.policies;
-    const lv = pp.retained.join(', ') + (pp.removed.length ? ' <span class="diff-removed">' + pp.removed.join(', ') + '</span>' : '');
-    const rv = pp.retained.join(', ') + (pp.added.length ? ' <span class="diff-added">' + pp.added.join(', ') + '</span>' : '');
+    const lv = pp.retained.join(', ') + (pp.removed.length ? ' <span class="diff-removed">'+pp.removed.join(', ')+'</span>' : '');
+    const rv = pp.retained.join(', ') + (pp.added.length   ? ' <span class="diff-added">'+pp.added.join(', ')+'</span>'   : '');
     rows.push(['Policies', lv, rv]);
   }
   if (changes.context_shift) {
-    rows.push(['Context', `—`, `similarity ${Math.round(changes.context_shift.similarity*100)}% — <span style="color:var(--yellow)">${changes.context_shift.note}</span>`]);
+    rows.push(['Context','—',`similarity ${Math.round(changes.context_shift.similarity*100)}% — <span style="color:var(--yellow)">${changes.context_shift.note}</span>`]);
   }
-
-  const noChanges = !rows.length && !Object.keys(changes).length;
-
   const summary = d.summary || {};
   document.getElementById('diff-result').innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      ${summary.output_changed ? '<span class="badge broken">Output changed</span>' : '<span class="badge intact">Same output</span>'}
-      ${summary.model_changed ? '<span class="badge" style="background:rgba(188,140,255,.15);color:var(--purple);border:1px solid rgba(188,140,255,.3)">Model changed</span>' : ''}
-      ${summary.policies_changed ? '<span class="badge" style="background:rgba(255,166,87,.1);color:var(--orange);border:1px solid rgba(255,166,87,.3)">Policies changed</span>' : ''}
+      ${summary.output_changed  ? '<span class="badge broken">Output changed</span>'  : '<span class="badge intact">Same output</span>'}
+      ${summary.model_changed   ? '<span class="badge" style="background:rgba(188,140,255,.15);color:var(--purple);border:1px solid rgba(188,140,255,.3)">Model changed</span>' : ''}
+      ${summary.policies_changed? '<span class="badge" style="background:rgba(255,166,87,.1);color:var(--orange);border:1px solid rgba(255,166,87,.3)">Policies changed</span>' : ''}
       ${summary.context_shifted ? '<span class="badge" style="background:rgba(88,166,255,.1);color:var(--accent);border:1px solid rgba(88,166,255,.3)">Context shifted</span>' : ''}
     </div>
-    ${noChanges
+    ${!rows.length
       ? '<div style="color:var(--green);font-size:12px">✓ No meaningful differences detected.</div>'
       : `<table class="diff-table">
-          <thead><tr>
-            <th>Field</th>
-            <th>Left <span style="font-family:monospace;font-weight:400">${shortId(d.left_id)}</span></th>
-            <th>Right <span style="font-family:monospace;font-weight:400">${shortId(d.right_id)}</span></th>
-          </tr></thead>
-          <tbody>
-            ${rows.map(([f, l, r]) => `<tr>
-              <td style="color:var(--muted)">${f}</td>
-              <td class="diff-removed">${l}</td>
-              <td class="diff-added">${r}</td>
-            </tr>`).join('')}
-          </tbody>
+          <thead><tr><th>Field</th><th>Left <span style="font-family:monospace;font-weight:400">${shortId(d.left_id)}</span></th><th>Right <span style="font-family:monospace;font-weight:400">${shortId(d.right_id)}</span></th></tr></thead>
+          <tbody>${rows.map(([f,l,r])=>`<tr><td style="color:var(--muted)">${f}</td><td class="diff-removed">${l}</td><td class="diff-added">${r}</td></tr>`).join('')}</tbody>
         </table>`
     }
     <div style="font-size:10px;color:var(--muted);margin-top:8px">
-      Context similarity: ${d.context_similarity != null ? Math.round(d.context_similarity*100)+'%' : 'N/A'}
+      Context similarity: ${d.context_similarity!=null?Math.round(d.context_similarity*100)+'%':'N/A'}
       &nbsp;·&nbsp; Left: ${fmtTime(d.left_timestamp)} &nbsp;·&nbsp; Right: ${fmtTime(d.right_timestamp)}
-    </div>
-  `;
+    </div>`;
+}
+
+// ── Compliance ─────────────────────────────────────────────────────────────
+
+function compAgentFilter() {
+  return document.getElementById('comp-agent-filter')?.value || '';
+}
+
+function buildCompliancePdfLink(agentName) {
+  const link = document.getElementById('comp-pdf-link');
+  if (!link) return;
+  const qs = agentName ? `?agent_name=${encodeURIComponent(agentName)}` : '';
+  link.href = `/api/v1/compliance/report.pdf${qs}`;
+}
+
+async function populateAgentFilter() {
+  try {
+    const agents = await apiFetch('/api/v1/agents/active');
+    const sel = document.getElementById('comp-agent-filter');
+    if (!sel) return;
+    const current = sel.value;
+    // Preserve any options beyond the default
+    while (sel.options.length > 1) sel.remove(1);
+    agents.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch(_) {}
+}
+
+async function loadCompliance() {
+  complianceLoaded = false;
+  document.getElementById('comp-loading').style.display = '';
+  document.getElementById('comp-loading').textContent = 'Running ISO 42001 gap analysis…';
+  document.getElementById('comp-loading').style.color = '';
+  document.getElementById('comp-content').style.display = 'none';
+
+  const agentName = compAgentFilter();
+  buildCompliancePdfLink(agentName);
+
+  const qs = agentName ? `?agent_name=${encodeURIComponent(agentName)}` : '';
+  try {
+    const report = await apiFetch(`/api/v1/compliance/iso-42001${qs}`);
+    renderCompliance(report);
+    complianceLoaded = true;
+    loadRemediation(agentName);
+  } catch(e) {
+    document.getElementById('comp-loading').textContent = `Error: ${e.message}`;
+    document.getElementById('comp-loading').style.color = 'var(--red)';
+  }
+}
+
+async function loadRemediation(agentName) {
+  const qs = agentName ? `?agent_name=${encodeURIComponent(agentName)}` : '';
+  try {
+    const data = await apiFetch(`/api/v1/compliance/remediation${qs}`);
+    const el = document.getElementById('comp-remediation');
+    el.style.display = '';
+    el.innerHTML = renderRemediationChecklist(data);
+  } catch(_) {}
+}
+
+function renderRemediationChecklist(data) {
+  const qw = data.quick_wins || [];
+  const dn = data.documentation_needed || [];
+  const ac = data.already_compliant || [];
+
+  function block(title, colour, items, statusClass) {
+    if (!items.length) return '';
+    return `
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;font-weight:700;color:${colour};margin-bottom:8px;border-bottom:2px solid ${colour};padding-bottom:4px">${title} (${items.length})</div>
+        ${items.map(item => `
+          <div style="padding:6px 0 6px 8px;border-left:3px solid ${colour};margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:10px;font-weight:700;background:${colour};color:#fff;padding:1px 6px;border-radius:3px">${item.req_id}</span>
+              <span style="font-size:12px;font-weight:600">${item.title}</span>
+            </div>
+            ${item.recommendation ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;margin-left:2px">→ ${item.recommendation}</div>` : ''}
+          </div>`).join('')}
+      </div>`;
+  }
+
+  return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px">
+        Remediation Checklist
+        <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:8px">${data.total_actionable} items need action</span>
+      </div>
+      ${block('Quick Wins (Partial Evidence)', 'var(--yellow)', qw)}
+      ${block('Documentation Needed (No Evidence)', 'var(--red)', dn)}
+      ${block('Already Compliant', 'var(--green)', ac)}
+    </div>`;
+}
+
+function gradeClass(g) { return 'grade-' + (g || 'F'); }
+
+function sectionScore(reqs) {
+  let w = 0, wt = 0;
+  const STATUS_SCORE = { MET: 1.0, PARTIAL: 0.5, NOT_MET: 0.0, NOT_APPLICABLE: null };
+  reqs.forEach(r => {
+    const s = STATUS_SCORE[r.status];
+    if (s !== null && s !== undefined) { w += s * r.weight; wt += r.weight; }
+  });
+  return wt ? Math.round(w / wt * 100) : 0;
+}
+
+function renderCompliance(report) {
+  document.getElementById('comp-loading').style.display = 'none';
+  document.getElementById('comp-content').style.display = '';
+
+  const pct   = report.overall_score_pct || 0;
+  const grade = report.score_grade || 'F';
+  const counts = report.counts || {};
+
+  // Header KPIs
+  document.getElementById('comp-pct').textContent   = pct + '%';
+  document.getElementById('comp-pct').className     = `score-pct ${gradeClass(grade)}`;
+  document.getElementById('kpi-met').textContent     = counts.met     || 0;
+  document.getElementById('kpi-partial').textContent = counts.partial  || 0;
+  document.getElementById('kpi-not-met').textContent = counts.not_met  || 0;
+  document.getElementById('kpi-na').textContent      = counts.na       || 0;
+  document.getElementById('kpi-core').textContent    = (report.core_clauses_pct  || 0) + '%';
+  document.getElementById('kpi-annex').textContent   = (report.annex_controls_pct || 0) + '%';
+
+  // Update header badge
+  updateBadge(pct, grade);
+
+  // Build section breakdown
+  const reqs = report.requirements || [];
+
+  // Group by section
+  const sections = {};
+  reqs.forEach(r => {
+    if (!sections[r.section]) sections[r.section] = { clause: r.clause, reqs: [] };
+    sections[r.section].reqs.push(r);
+  });
+
+  // Split core vs annex
+  const coreGroups  = Object.entries(sections).filter(([,v]) => v.clause.startsWith('Clause'));
+  const annexGroups = Object.entries(sections).filter(([,v]) => v.clause.startsWith('Annex'));
+
+  const body = document.getElementById('comp-body');
+  body.innerHTML = renderSectionGroup('Core Clauses (4–10)', coreGroups) +
+                   renderSectionGroup('Annex A Controls', annexGroups);
+
+  // Wire expand/collapse
+  body.querySelectorAll('.section-bar').forEach(bar => {
+    bar.addEventListener('click', () => {
+      const target = document.getElementById(bar.dataset.target);
+      if (!target) return;
+      const open = target.classList.toggle('open');
+      bar.classList.toggle('expanded', open);
+    });
+  });
+}
+
+function renderSectionGroup(title, groups) {
+  if (!groups.length) return '';
+  return `
+    <div class="section-group">
+      <div class="section-group-title">${title}</div>
+      ${groups.map(([sec, {reqs}]) => {
+        const sp = sectionScore(reqs);
+        const fillClass = sp >= 70 ? 'score-high' : sp >= 40 ? 'score-mid' : (sp > 0 ? 'score-low' : 'score-zero');
+        const listId = 'sec-' + sec.replace(/[^a-z0-9]/gi, '-');
+        return `
+          <div class="section-bar" data-target="${listId}">
+            <span class="section-name" title="${sec}">${sec}</span>
+            <div class="bar-track"><div class="bar-fill ${fillClass}" style="width:${sp}%"></div></div>
+            <span class="section-pct" style="color:${sp>=70?'var(--green)':sp>=40?'var(--yellow)':'var(--red)'}">${sp}%</span>
+          </div>
+          <div class="req-list" id="${listId}">
+            ${reqs.map(r => `
+              <div class="req-item">
+                <span class="req-id">${r.req_id}</span>
+                <div>
+                  <div class="req-title">${r.title}</div>
+                  <div class="req-evidence">${r.evidence}</div>
+                  ${r.status !== 'MET' ? `<div class="req-rec">→ ${r.recommendation}</div>` : ''}
+                </div>
+                <span class="req-status-pill status-${r.status}">${r.status.replace('_',' ')}</span>
+              </div>
+            `).join('')}
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function updateBadge(pct, grade) {
+  document.getElementById('badge-grade').textContent = grade;
+  document.getElementById('badge-grade').className   = `grade ${gradeClass(grade)}`;
+  document.getElementById('badge-pct').textContent   = pct + '%';
+}
+
+async function loadComplianceBadge() {
+  try {
+    const s = await apiFetch('/api/v1/compliance/summary');
+    updateBadge(s.overall_score_pct, s.score_grade);
+  } catch(_) {}
+  populateAgentFilter();
 }
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 
 function switchTab(name) {
-  document.querySelectorAll('.tab-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.tab === name);
-  });
-  document.querySelectorAll('.tab-panel').forEach(p => {
-    p.classList.toggle('active', p.id === `tab-${name}`);
-  });
-
-  // Lazy-load heavy tabs
-  if (name === 'replay') loadReplay();
-  if (name === 'blame') loadBlame();
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+  if (name === 'replay')     loadReplay();
+  if (name === 'blame')      loadBlame();
+  if (name === 'compliance' && !complianceLoaded) loadCompliance();
 }
 
+// Open compliance tab from badge
+document.getElementById('compliance-badge').addEventListener('click', () => {
+  // Show detail panel with compliance tab even without a selected decision
+  document.getElementById('empty-state').style.display = 'none';
+  const content = document.getElementById('detail-content');
+  content.style.display = 'flex';
+  // Hide decision-specific header
+  document.getElementById('detail-header').style.display = 'none';
+  // Show compliance tab
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-compliance').classList.add('active');
+  if (!complianceLoaded) loadCompliance();
+});
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  btn.addEventListener('click', () => {
+    document.getElementById('detail-header').style.display = '';
+    switchTab(btn.dataset.tab);
+  });
 });
 
 // ── Event wiring ───────────────────────────────────────────────────────────
@@ -927,13 +1181,31 @@ document.getElementById('search-bar').addEventListener('input', () => {
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(loadList, 400);
 });
+['filter-days', 'filter-agent', 'filter-value'].forEach(id =>
+  document.getElementById(id).addEventListener('change', loadList)
+);
 
-['filter-days', 'filter-value'].forEach(id => {
-  document.getElementById(id).addEventListener('change', loadList);
-});
+// ── Init ───────────────────────────────────────────────────────────────────
 
-// Initial load
-loadList();
+async function init() {
+  // Populate agent dropdown
+  try {
+    const agents = await apiFetch('/api/v1/agents/active');
+    const sel = document.getElementById('filter-agent');
+    agents.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name.replace(/^triage-agent-/, '') + ' agent';
+      sel.appendChild(opt);
+    });
+  } catch(_) {}
+
+  // Load badge and list in parallel
+  loadComplianceBadge();
+  loadList();
+}
+
+init();
 </script>
 </body>
 </html>

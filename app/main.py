@@ -6,7 +6,7 @@ load_dotenv()
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from app.agent_graph import triage_agent
 from app.prooflayer_api import router as prooflayer_router
+from app.prooflayer_graph import record_decision
 from app.security.guard_classifier import guard_classify
 from app.security.input_sanitizer import InputSanitizer
 from app.security.output_filter import OutputFilter
@@ -84,13 +85,30 @@ class ResumeRequest(BaseModel):
 @app.post("/triage", response_model=TriageResponse)
 @audit_record(agent_id="ai-triage-agent", model_id="deepseek/deepseek-chat")
 @observe(name="triage")
-async def triage(request: TriageRequest):
+async def triage(request: TriageRequest, background_tasks: BackgroundTasks):
     if not request.message.strip():
         raise HTTPException(status_code=422, detail="message cannot be empty")
 
     if _is_arabic(request.message):
-        return await _triage_ar(request)
-    return await _triage_en(request)
+        result = await _triage_ar(request)
+        agent_name = "triage-agent-ar"
+    else:
+        result = await _triage_en(request)
+        agent_name = "triage-agent-en"
+
+    background_tasks.add_task(
+        record_decision,
+        decision_value=result.intent,
+        confidence=result.confidence,
+        input_query=request.message,
+        session_id=result.thread_id or request.session_id or "",
+        agent_name=agent_name,
+        model_id="deepseek/deepseek-chat",
+        reasoning_summary="pending-escalation" if result.interrupted else result.response[:500],
+        human_override=False,
+    )
+
+    return result
 
 
 async def _triage_en(request: TriageRequest) -> TriageResponse:

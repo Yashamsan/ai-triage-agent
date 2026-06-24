@@ -5,6 +5,7 @@ Route order matters: literal paths (/decisions/diff, /decisions/compare) are
 registered before the parametric /decisions/{id} to prevent shadowing.
 """
 
+import io
 import json
 import os
 from typing import Any
@@ -13,6 +14,7 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.prooflayer_graph import record_decision
@@ -137,6 +139,26 @@ def list_agents():
         )
         for r in rows
     ]
+
+
+# NOTE: /agents/active must be declared before any future /agents/{id} route.
+@router.get("/agents/active")
+def list_active_agents():
+    """Distinct agent names that have at least one recorded Decision node."""
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT DISTINCT agent_name
+        FROM pl_nodes
+        WHERE node_type = 'Decision' AND agent_name IS NOT NULL
+        ORDER BY agent_name
+        """
+    )
+    names = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return names
 
 
 # ── Ingestion ─────────────────────────────────────────────────────────────────
@@ -278,12 +300,12 @@ def get_decision(decision_id: str):
     # Edges + connected nodes (timeline)
     cur.execute(
         """
-        SELECT e.edge_type, e.properties AS edge_props, e.created_at AS edge_at,
+        SELECT e.edge_type, e.properties AS edge_props, e.valid_from AS edge_at,
                n.node_type, n.properties AS node_props
         FROM pl_edges e
         JOIN pl_nodes n ON n.node_id = e.to_node_id
         WHERE e.from_node_id = %s
-        ORDER BY e.created_at
+        ORDER BY e.valid_from
         """,
         (decision_id,),
     )
@@ -328,6 +350,64 @@ def blame(decision_id: str):
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+
+# ── ISO 42001 Compliance ──────────────────────────────────────────────────────
+
+
+@router.get("/compliance/iso-42001")
+def api_iso_42001_report(
+    agent_name: str | None = Query(None, description="Filter by agent name"),
+) -> dict[str, Any]:
+    """Full ISO 42001:2023 gap analysis — 65 requirements with live evidence."""
+    from app.compliance import generate_iso_42001_report
+    try:
+        return generate_iso_42001_report(agent_name=agent_name)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/compliance/summary")
+def api_compliance_summary(
+    agent_name: str | None = Query(None, description="Filter by agent name"),
+) -> dict[str, Any]:
+    """Quick ISO 42001 compliance scorecard for the admin dashboard header."""
+    from app.compliance import generate_compliance_summary
+    try:
+        return generate_compliance_summary(agent_name=agent_name)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/compliance/remediation")
+def api_compliance_remediation(
+    agent_name: str | None = Query(None, description="Filter by agent name"),
+) -> dict[str, Any]:
+    """Prioritised remediation checklist: quick wins, documentation gaps, and compliant items."""
+    from app.compliance import generate_remediation_checklist
+    try:
+        return generate_remediation_checklist(agent_name=agent_name)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/compliance/report.pdf")
+def api_compliance_pdf(
+    agent_name: str | None = Query(None, description="Filter by agent name"),
+):
+    """Generate and download an ISO 42001:2023 compliance report as a PDF."""
+    from app.compliance_pdf import generate_compliance_pdf
+    try:
+        pdf_bytes = generate_compliance_pdf(agent_name=agent_name)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    filename = f"iso42001_compliance{'_' + agent_name if agent_name else ''}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Audit Report ──────────────────────────────────────────────────────────────
