@@ -26,8 +26,8 @@ from app.compliance import (
 
 
 def _safe(text: str, maxlen: int = 0) -> str:
-    “””Encode to latin-1, replacing any non-latin-1 character with ‘?’.”””
-    text = text.encode(“latin-1”, errors=”replace”).decode(“latin-1”)
+    """Encode to latin-1, replacing any non-latin-1 character with '?'."""
+    text = text.encode("latin-1", errors="replace").decode("latin-1")
     if maxlen:
         text = text[:maxlen]
     return text
