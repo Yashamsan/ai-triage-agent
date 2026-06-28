@@ -326,7 +326,7 @@ def list_exceptions(
     conn = _get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    clauses = ["created_at >= NOW() - INTERVAL '1 day' * %(since_days)s"]
+    clauses = ["e.created_at >= NOW() - INTERVAL '1 day' * %(since_days)s"]
     params: dict[str, Any] = {"since_days": since_days, "limit": limit}
     if severity:
         clauses.append("severity = %(severity)s")

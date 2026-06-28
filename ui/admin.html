@@ -1184,8 +1184,9 @@ async function loadTrace() {
   document.getElementById('trace-content').style.display = 'none';
   document.getElementById('trace-empty').style.display = 'none';
   try {
-    const steps = await apiFetch(`/api/v1/decisions/${currentId}/trace`);
-    if (!steps || !steps.length) {
+    const data = await apiFetch(`/api/v1/decisions/${currentId}/trace`);
+    const steps = (data && data.steps) || [];
+    if (!steps.length) {
       document.getElementById('trace-loading').style.display = 'none';
       document.getElementById('trace-empty').style.display = '';
       return;
@@ -1260,7 +1261,7 @@ async function submitException() {
   const narrative = document.getElementById('ex-narrative').value.trim();
   if (!narrative) { alert('Human narrative is required.'); return; }
   const body = {
-    decision_node_id: currentId,
+    decision_id: currentId,
     human_narrative: narrative,
     approver: document.getElementById('ex-approver').value.trim() || null,
     approval_channel: document.getElementById('ex-channel').value.trim() || null,
