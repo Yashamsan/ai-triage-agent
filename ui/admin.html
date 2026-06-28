@@ -556,6 +556,14 @@
     border-radius: 3px;
     padding: 1px 5px;
   }
+  .badge-trace {
+    font-size: 9px;
+    background: rgba(56,189,248,.10);
+    color: #38bdf8;
+    border: 1px solid rgba(56,189,248,.25);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
 
   /* Print styles */
   @media print {
@@ -789,7 +797,7 @@
           </div>
         </div>
         <div id="trace-empty" style="display:none;color:var(--muted);font-size:12px;padding:20px 0;text-align:center">
-          No trace steps recorded for this decision.
+          No trace steps for this decision. Select one marked <span class="badge-trace" style="display:inline">N steps</span> in the list.
         </div>
       </div>
 
@@ -938,9 +946,10 @@ function renderList(decisions) {
         <span>${fmtTime(d.timestamp)}</span>
         ${d.human_override ? '<span style="color:var(--red)">⚠ override</span>' : ''}
       </div>
-      ${(d.contains_pii || d.agent_group) ? `<div class="di-badges">
+      ${(d.contains_pii || d.agent_group || d.trace_step_count > 0) ? `<div class="di-badges">
         ${d.contains_pii ? '<span class="badge-pii">PII</span>' : ''}
         ${d.agent_group ? `<span class="badge-group">${d.agent_group}</span>` : ''}
+        ${d.trace_step_count > 0 ? `<span class="badge-trace">${d.trace_step_count} steps</span>` : ''}
       </div>` : ''}
     </div>
   `).join('');

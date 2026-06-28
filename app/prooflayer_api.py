@@ -125,6 +125,7 @@ class DecisionSummary(BaseModel):
     contains_pii: bool
     agent_group: str | None
     timestamp: str
+    trace_step_count: int = 0
 
 
 class ExceptionRequest(BaseModel):
@@ -491,10 +492,14 @@ def search_decisions(
     where = " AND ".join(clauses)
     cur.execute(
         f"""
-        SELECT node_id, properties, created_at, agent_name,
-               contains_pii, agent_group
+        SELECT n.node_id, n.properties, n.created_at, n.agent_name,
+               n.contains_pii, n.agent_group,
+               COUNT(t.step_id) AS trace_step_count
         FROM pl_nodes n
+        LEFT JOIN pl_trace_steps t ON t.decision_node_id = n.node_id
         WHERE {where}
+        GROUP BY n.node_id, n.properties, n.created_at, n.agent_name,
+                 n.contains_pii, n.agent_group
         ORDER BY n.created_at DESC
         LIMIT %(limit)s
         """,
@@ -519,6 +524,7 @@ def search_decisions(
                 contains_pii=bool(row.get("contains_pii", False)),
                 agent_group=row.get("agent_group"),
                 timestamp=row["created_at"].isoformat(),
+                trace_step_count=int(row.get("trace_step_count") or 0),
             )
         )
     return summaries
