@@ -425,6 +425,138 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+  /* ── Trace steps tab ── */
+  .trace-step {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .trace-step + .trace-step::before {
+    content: '';
+    display: block;
+    width: 2px;
+    height: 10px;
+    background: var(--border);
+    margin: -10px auto 0;
+    margin-bottom: 0;
+    position: absolute;
+    left: 50%;
+    top: -10px;
+  }
+  .trace-step-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--border);
+    color: var(--text);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-type {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--purple);
+  }
+  .step-conf {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .step-row { display: flex; gap: 6px; margin-bottom: 5px; font-size: 11px; }
+  .step-label { min-width: 70px; color: var(--muted); font-weight: 600; }
+  .step-val { color: var(--text); line-height: 1.5; }
+  .step-latency { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Exceptions tab ── */
+  .ex-item {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .ex-item.sev-critical { border-color: var(--red); background: rgba(248,81,73,.04); }
+  .ex-item.sev-high     { border-color: var(--orange); background: rgba(255,166,87,.04); }
+  .ex-item.sev-medium   { border-color: var(--yellow); background: rgba(210,153,34,.04); }
+  .ex-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .sev-pill {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border-radius: 20px;
+    padding: 2px 8px;
+  }
+  .sev-critical { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+  .sev-high     { background: rgba(255,166,87,.15); color: var(--orange); border: 1px solid rgba(255,166,87,.3); }
+  .sev-medium   { background: rgba(210,153,34,.12); color: var(--yellow); border: 1px solid rgba(210,153,34,.3); }
+  .sev-low      { background: rgba(139,148,158,.1); color: var(--muted); border: 1px solid var(--border); }
+  .ex-narrative { font-size: 12px; color: var(--text); line-height: 1.6; margin-bottom: 8px; }
+  .ex-meta-row  { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--muted); }
+
+  /* ── Governance tab ── */
+  .gov-kpi-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .gov-kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    flex: 1;
+    min-width: 120px;
+  }
+  .gov-kpi .gkv { font-size: 22px; font-weight: 700; }
+  .gov-kpi .gkl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+  .gov-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .gov-table th { text-align: left; padding: 6px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .gov-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .gov-table tr:last-child td { border-bottom: none; }
+  .gov-table tr:hover td { background: rgba(88,166,255,.04); }
+  .pii-flag { font-size: 11px; color: var(--red); font-weight: 700; }
+  .group-pill {
+    background: rgba(188,140,255,.12);
+    border: 1px solid rgba(188,140,255,.3);
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 10px;
+    color: var(--purple);
+    white-space: nowrap;
+  }
+  .di-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+  .badge-pii {
+    font-size: 9px;
+    font-weight: 700;
+    background: rgba(248,81,73,.15);
+    color: var(--red);
+    border: 1px solid rgba(248,81,73,.3);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  .badge-group {
+    font-size: 9px;
+    background: rgba(188,140,255,.12);
+    color: var(--purple);
+    border: 1px solid rgba(188,140,255,.3);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
   /* Print styles */
   @media print {
     body { background: white; color: black; font-size: 11px; height: auto; overflow: visible; }
@@ -497,6 +629,9 @@
           <button class="tab-btn" data-tab="diff">Diff</button>
           <button class="tab-btn" data-tab="timeline">Timeline</button>
           <button class="tab-btn" data-tab="compliance">🔐 Compliance</button>
+          <button class="tab-btn" data-tab="trace">🧠 Trace</button>
+          <button class="tab-btn" data-tab="exceptions">💬 Exceptions</button>
+          <button class="tab-btn" data-tab="governance">🔗 Governance</button>
         </div>
       </div>
 
@@ -611,6 +746,22 @@
                 <span class="kpi-val" style="color:var(--purple)" id="kpi-annex">—%</span>
                 <span class="kpi-lbl">Annex A</span>
               </div>
+              <div class="comp-kpi" title="Ghost Knowledge exceptions logged">
+                <span class="kpi-val" style="color:var(--orange)" id="kpi-exceptions">—</span>
+                <span class="kpi-lbl">Exceptions</span>
+              </div>
+              <div class="comp-kpi" title="Reasoning trace steps recorded">
+                <span class="kpi-val" style="color:var(--purple)" id="kpi-trace-steps">—</span>
+                <span class="kpi-lbl">Trace Steps</span>
+              </div>
+              <div class="comp-kpi" title="Decisions flagged as containing PII">
+                <span class="kpi-val" style="color:var(--red)" id="kpi-pii">—</span>
+                <span class="kpi-lbl">PII Decisions</span>
+              </div>
+              <div class="comp-kpi" title="Distinct agent groups in governance">
+                <span class="kpi-val" style="color:var(--accent)" id="kpi-groups">—</span>
+                <span class="kpi-lbl">Agent Groups</span>
+              </div>
             </div>
             <div class="comp-actions">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -625,6 +776,85 @@
           </div>
           <div class="comp-body" id="comp-body"></div>
           <div id="comp-remediation" style="display:none;margin-top:16px"></div>
+        </div>
+      </div>
+
+      <!-- Trace (Reasoning Memory) -->
+      <div class="tab-panel" id="tab-trace">
+        <div id="trace-loading" class="loading">Loading reasoning trace…</div>
+        <div id="trace-content" style="display:none">
+          <div class="card">
+            <div class="card-title">🧠 Reasoning Trace — Thought · Action · Observation</div>
+            <div id="trace-steps"></div>
+          </div>
+        </div>
+        <div id="trace-empty" style="display:none;color:var(--muted);font-size:12px;padding:20px 0;text-align:center">
+          No trace steps recorded for this decision.
+        </div>
+      </div>
+
+      <!-- Exceptions (Ghost Knowledge) -->
+      <div class="tab-panel" id="tab-exceptions">
+        <div id="ex-loading" class="loading">Loading exceptions…</div>
+        <div id="ex-content" style="display:none">
+          <div class="card">
+            <div class="card-title">💬 Policy Exceptions — Ghost Knowledge</div>
+            <div id="ex-list"></div>
+          </div>
+          <div class="card" style="margin-top:0">
+            <div class="card-title">Log New Exception</div>
+            <div style="display:grid;gap:10px">
+              <textarea id="ex-narrative" placeholder="Human narrative: describe the exception and reasoning…"
+                style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;min-height:80px;resize:vertical;outline:none;font-family:inherit"></textarea>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input id="ex-approver" placeholder="Approver name" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none" />
+                <input id="ex-channel" placeholder="Channel (slack/email/ticket)" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none" />
+                <input id="ex-policy" placeholder="Policy violated" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none" />
+                <select id="ex-severity" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div>
+                <button class="btn" onclick="submitException()">Log Exception</button>
+                <span id="ex-submit-msg" style="font-size:11px;color:var(--green);margin-left:10px;display:none">Logged.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Governance (Cross-Agent PII) -->
+      <div class="tab-panel" id="tab-governance">
+        <div id="gov-loading" class="loading">Loading governance report…</div>
+        <div id="gov-content" style="display:none">
+          <div class="gov-kpi-row" id="gov-kpis"></div>
+          <div class="card">
+            <div class="card-title">🔗 Cross-Agent Decision Coverage</div>
+            <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:11px;color:var(--muted)">PII only:</label>
+              <input type="checkbox" id="gov-pii-filter" onchange="loadGovernance()" />
+              <label style="font-size:11px;color:var(--muted);margin-left:8px">Agent group:</label>
+              <input id="gov-group-filter" placeholder="all groups" style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-size:11px;outline:none;width:140px" onchange="loadGovernance()" />
+              <label style="font-size:11px;color:var(--muted);margin-left:8px">Days:</label>
+              <select id="gov-days" onchange="loadGovernance()" style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-size:11px;outline:none">
+                <option value="7">7</option>
+                <option value="30" selected>30</option>
+                <option value="90">90</option>
+              </select>
+              <button class="btn secondary" onclick="loadGovernance()">↻ Refresh</button>
+            </div>
+            <table class="gov-table" id="gov-by-agent">
+              <thead><tr><th>Agent</th><th>Group</th><th>Decisions</th><th>PII</th><th>PII %</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card" id="gov-decisions-card">
+            <div class="card-title">Recent Governed Decisions</div>
+            <div id="gov-decisions-list"></div>
+          </div>
         </div>
       </div>
 
@@ -708,6 +938,10 @@ function renderList(decisions) {
         <span>${fmtTime(d.timestamp)}</span>
         ${d.human_override ? '<span style="color:var(--red)">⚠ override</span>' : ''}
       </div>
+      ${(d.contains_pii || d.agent_group) ? `<div class="di-badges">
+        ${d.contains_pii ? '<span class="badge-pii">PII</span>' : ''}
+        ${d.agent_group ? `<span class="badge-group">${d.agent_group}</span>` : ''}
+      </div>` : ''}
     </div>
   `).join('');
 }
@@ -749,6 +983,8 @@ function renderOverview(d) {
     `<span>Confidence: ${fmtConf(p.confidence_score || 0)}</span>`,
     p.human_override ? `<span style="color:var(--red)">⚠ Human Override</span>` : '',
     p.session_id ? `<span style="font-family:monospace;font-size:10px">session: ${p.session_id}</span>` : '',
+    d.contains_pii ? `<span class="badge-pii">PII</span>` : '',
+    d.agent_group  ? `<span class="group-pill">${d.agent_group}</span>` : '',
   ].filter(Boolean).join('');
 
   document.getElementById('ov-props').innerHTML = Object.entries(p)
@@ -938,6 +1174,207 @@ function renderDiff(d) {
       Context similarity: ${d.context_similarity!=null?Math.round(d.context_similarity*100)+'%':'N/A'}
       &nbsp;·&nbsp; Left: ${fmtTime(d.left_timestamp)} &nbsp;·&nbsp; Right: ${fmtTime(d.right_timestamp)}
     </div>`;
+}
+
+// ── Trace (Reasoning Memory) ───────────────────────────────────────────────
+
+async function loadTrace() {
+  if (!currentId) return;
+  document.getElementById('trace-loading').style.display = '';
+  document.getElementById('trace-content').style.display = 'none';
+  document.getElementById('trace-empty').style.display = 'none';
+  try {
+    const steps = await apiFetch(`/api/v1/decisions/${currentId}/trace`);
+    if (!steps || !steps.length) {
+      document.getElementById('trace-loading').style.display = 'none';
+      document.getElementById('trace-empty').style.display = '';
+      return;
+    }
+    renderTrace(steps);
+  } catch(e) {
+    document.getElementById('trace-loading').textContent = e.message;
+    document.getElementById('trace-loading').style.color = 'var(--red)';
+  }
+}
+
+function renderTrace(steps) {
+  document.getElementById('trace-loading').style.display = 'none';
+  document.getElementById('trace-content').style.display = '';
+  document.getElementById('trace-steps').innerHTML = steps.map((s, i) => `
+    <div class="trace-step">
+      <div class="trace-step-header">
+        <span class="step-num">${i + 1}</span>
+        <span class="step-type">${s.node_type || 'step'}</span>
+        ${s.confidence != null ? `<span class="step-conf">${Math.round(s.confidence * 100)}% conf</span>` : ''}
+      </div>
+      ${s.thought    ? `<div class="step-row"><span class="step-label">Thought</span><span class="step-val">${s.thought}</span></div>` : ''}
+      ${s.action     ? `<div class="step-row"><span class="step-label">Action</span><span class="step-val">${s.action}</span></div>` : ''}
+      ${s.observation? `<div class="step-row"><span class="step-label">Observation</span><span class="step-val">${s.observation}</span></div>` : ''}
+      ${s.latency_ms != null ? `<div class="step-latency">${s.latency_ms.toFixed(0)} ms</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ── Exceptions (Ghost Knowledge) ────────────────────────────────────────────
+
+async function loadExceptions() {
+  if (!currentId) return;
+  document.getElementById('ex-loading').style.display = '';
+  document.getElementById('ex-content').style.display = 'none';
+  try {
+    const exs = await apiFetch(`/api/v1/exceptions?decision_id=${currentId}`);
+    renderExceptions(exs || []);
+  } catch(e) {
+    document.getElementById('ex-loading').textContent = e.message;
+    document.getElementById('ex-loading').style.color = 'var(--red)';
+  }
+}
+
+function renderExceptions(exs) {
+  document.getElementById('ex-loading').style.display = 'none';
+  document.getElementById('ex-content').style.display = '';
+  const list = document.getElementById('ex-list');
+  if (!exs.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px 0">No exceptions on record for this decision.</div>';
+    return;
+  }
+  list.innerHTML = exs.map(ex => `
+    <div class="ex-item sev-${ex.severity || 'low'}">
+      <div class="ex-header">
+        <span class="sev-pill sev-${ex.severity || 'low'}">${(ex.severity || 'low').toUpperCase()}</span>
+        ${ex.policy_violated ? `<span style="font-size:11px;color:var(--muted)">Policy: <strong style="color:var(--text)">${ex.policy_violated}</strong></span>` : ''}
+        <span style="font-size:10px;color:var(--muted);margin-left:auto">${fmtTime(ex.created_at)}</span>
+      </div>
+      <div class="ex-narrative">${ex.human_narrative}</div>
+      <div class="ex-meta-row">
+        ${ex.approver       ? `<span>Approver: <strong>${ex.approver}</strong></span>` : ''}
+        ${ex.approval_channel ? `<span>Via: ${ex.approval_channel}</span>` : ''}
+        ${ex.justification  ? `<span>Justification: ${ex.justification}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function submitException() {
+  if (!currentId) return;
+  const narrative = document.getElementById('ex-narrative').value.trim();
+  if (!narrative) { alert('Human narrative is required.'); return; }
+  const body = {
+    decision_node_id: currentId,
+    human_narrative: narrative,
+    approver: document.getElementById('ex-approver').value.trim() || null,
+    approval_channel: document.getElementById('ex-channel').value.trim() || null,
+    policy_violated: document.getElementById('ex-policy').value.trim() || null,
+    severity: document.getElementById('ex-severity').value,
+  };
+  try {
+    const res = await fetch('/api/v1/exceptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+    document.getElementById('ex-narrative').value = '';
+    document.getElementById('ex-approver').value = '';
+    document.getElementById('ex-channel').value = '';
+    document.getElementById('ex-policy').value = '';
+    const msg = document.getElementById('ex-submit-msg');
+    msg.style.display = '';
+    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    loadExceptions();
+  } catch(e) {
+    alert('Failed to log exception: ' + e.message);
+  }
+}
+
+// ── Governance (Cross-Agent PII) ────────────────────────────────────────────
+
+async function loadGovernance() {
+  document.getElementById('gov-loading').style.display = '';
+  document.getElementById('gov-content').style.display = 'none';
+  const pii   = document.getElementById('gov-pii-filter')?.checked ? 'true' : '';
+  const group = document.getElementById('gov-group-filter')?.value.trim() || '';
+  const days  = document.getElementById('gov-days')?.value || '30';
+  const agent = document.getElementById('filter-agent').value;
+  const params = new URLSearchParams({ since_days: days });
+  if (pii)   params.set('contains_pii', 'true');
+  if (group) params.set('agent_group', group);
+  if (agent) params.set('agent_name', agent);
+  try {
+    const data = await apiFetch(`/api/v1/governance?${params}`);
+    renderGovernance(data);
+  } catch(e) {
+    document.getElementById('gov-loading').textContent = e.message;
+    document.getElementById('gov-loading').style.color = 'var(--red)';
+  }
+}
+
+function renderGovernance(data) {
+  document.getElementById('gov-loading').style.display = 'none';
+  document.getElementById('gov-content').style.display = '';
+  const t = data.totals || {};
+  document.getElementById('gov-kpis').innerHTML = [
+    { val: t.total_decisions ?? '—', lbl: 'Total Decisions', color: 'var(--text)' },
+    { val: t.pii_decisions ?? '—',   lbl: 'PII Decisions',   color: 'var(--red)' },
+    { val: t.agent_count ?? '—',     lbl: 'Agents',          color: 'var(--accent)' },
+    { val: t.group_count ?? '—',     lbl: 'Agent Groups',    color: 'var(--purple)' },
+  ].map(k => `
+    <div class="gov-kpi">
+      <div class="gkv" style="color:${k.color}">${k.val}</div>
+      <div class="gkl">${k.lbl}</div>
+    </div>
+  `).join('');
+
+  const tbody = document.querySelector('#gov-by-agent tbody');
+  const byAgent = data.by_agent || [];
+  if (!byAgent.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">No data found for the selected filters.</td></tr>';
+  } else {
+    tbody.innerHTML = byAgent.map(a => {
+      const piiPct = a.total > 0 ? Math.round((a.pii_count / a.total) * 100) : 0;
+      return `<tr>
+        <td style="color:var(--purple)">${a.agent_name}</td>
+        <td>${a.agent_group ? `<span class="group-pill">${a.agent_group}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${a.total}</td>
+        <td>${a.pii_count > 0 ? `<span class="pii-flag">${a.pii_count}</span>` : '0'}</td>
+        <td style="color:${piiPct > 50 ? 'var(--red)' : piiPct > 20 ? 'var(--yellow)' : 'var(--muted)'}">${piiPct}%</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const decisions = data.decisions || [];
+  const dl = document.getElementById('gov-decisions-list');
+  if (!decisions.length) {
+    dl.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">No decisions match current filters.</div>';
+  } else {
+    dl.innerHTML = decisions.slice(0, 20).map(d => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer"
+           onclick="selectDecision('${d.decision_id}', null)">
+        <span style="font-family:monospace;font-size:10px;color:var(--muted)">${d.decision_id.substring(0, 8)}</span>
+        <span class="${outcomeClass(d.decision_value)}" style="font-weight:600">${d.decision_value || '—'}</span>
+        <span style="color:var(--purple)">${d.agent_name || '—'}</span>
+        ${d.contains_pii ? '<span class="badge-pii">PII</span>' : ''}
+        ${d.agent_group  ? `<span class="badge-group">${d.agent_group}</span>` : ''}
+        <span style="margin-left:auto;color:var(--muted)">${fmtTime(d.timestamp)}</span>
+      </div>
+    `).join('');
+  }
+}
+
+// ── v3 KPIs (Overview) ─────────────────────────────────────────────────────
+
+async function loadV3KPIs() {
+  try {
+    const ov = await apiFetch('/api/v1/overview');
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val != null) el.textContent = val;
+    };
+    set('kpi-exceptions',  ov.exception_count);
+    set('kpi-trace-steps', ov.trace_step_count);
+    set('kpi-pii',         ov.pii_decision_count);
+    set('kpi-groups',      ov.agent_group_count);
+  } catch(_) {}
 }
 
 // ── Compliance ─────────────────────────────────────────────────────────────
@@ -1149,9 +1586,12 @@ async function loadComplianceBadge() {
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
-  if (name === 'replay')     loadReplay();
-  if (name === 'blame')      loadBlame();
+  if (name === 'replay')      loadReplay();
+  if (name === 'blame')       loadBlame();
   if (name === 'compliance' && !complianceLoaded) loadCompliance();
+  if (name === 'trace')       loadTrace();
+  if (name === 'exceptions')  loadExceptions();
+  if (name === 'governance')  loadGovernance();
 }
 
 // Open compliance tab from badge
@@ -1200,8 +1640,9 @@ async function init() {
     });
   } catch(_) {}
 
-  // Load badge and list in parallel
+  // Load badge, v3 KPIs and list in parallel
   loadComplianceBadge();
+  loadV3KPIs();
   loadList();
 }
 

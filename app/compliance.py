@@ -1195,7 +1195,206 @@ def _a10_5(agent_name: str | None = None) -> CheckResult:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Requirement catalogue — 65 requirements
+# v3 ProofLayer proof-query check functions (PL.1 – PL.5)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _pl_exception_tracking(agent_name: str | None = None) -> CheckResult:
+    """PL.1 — Ghost Knowledge: are human exceptions being recorded?"""
+    af, ap = _af(agent_name)
+    # Count exceptions linked to decisions for this agent
+    exc_count = _count(
+        f"""
+        SELECT COUNT(*) FROM pl_exceptions e
+        JOIN pl_nodes n ON n.node_id = e.decision_node_id
+        WHERE n.node_type = 'Decision'{af}
+        """,
+        ap,
+    )
+    override_count = _count(
+        f"""
+        SELECT COUNT(*) FROM pl_nodes
+        WHERE node_type='Decision'
+          AND (properties->>'human_override')::BOOLEAN = TRUE{af}
+        """,
+        ap,
+    )
+    if exc_count == 0 and override_count == 0:
+        return CheckResult(
+            NOT_MET,
+            "No exception narratives or human overrides recorded.",
+            "Use POST /api/v1/exceptions to capture approver narrative for every policy exception.",
+            {"exception_count": 0, "override_count": 0},
+        )
+    if exc_count == 0 and override_count > 0:
+        return CheckResult(
+            PARTIAL,
+            f"{override_count} human overrides found but no structured exception narratives captured.",
+            "For each override, post a human narrative via POST /api/v1/exceptions with approver and justification.",
+            {"exception_count": 0, "override_count": override_count},
+        )
+    return CheckResult(
+        MET,
+        f"{exc_count} exception narratives recorded across {override_count} overrides.",
+        "Maintain exception audit trail; review high-severity exceptions quarterly.",
+        {"exception_count": exc_count, "override_count": override_count},
+    )
+
+
+def _pl_trace_steps(agent_name: str | None = None) -> CheckResult:
+    """PL.2 — Reasoning Memory: are Thought->Action->Observation steps captured?"""
+    af, ap = _af(agent_name)
+    step_count = _count(
+        f"""
+        SELECT COUNT(*) FROM pl_trace_steps ts
+        JOIN pl_nodes n ON n.node_id = ts.decision_node_id
+        WHERE n.node_type = 'Decision'{af}
+        """,
+        ap,
+    )
+    decision_count = _count(
+        f"SELECT COUNT(*) FROM pl_nodes WHERE node_type='Decision'{af}",
+        ap,
+    )
+    if step_count == 0:
+        return CheckResult(
+            NOT_MET,
+            "No reasoning trace steps recorded.",
+            "Emit trace steps per graph node via POST /api/v1/trace-steps or include trace_steps[] in POST /api/v1/decisions.",
+            {"step_count": 0, "decision_count": decision_count},
+        )
+    pct = round(step_count / max(decision_count, 1), 1)
+    if pct < 1.0:
+        return CheckResult(
+            PARTIAL,
+            f"{step_count} trace steps across {decision_count} decisions (avg {pct:.1f} steps/decision).",
+            "Instrument all graph nodes to emit trace steps; aim for >=2 steps per decision.",
+            {"step_count": step_count, "decision_count": decision_count, "avg_steps": pct},
+        )
+    return CheckResult(
+        MET,
+        f"{step_count} trace steps across {decision_count} decisions ({pct:.1f} avg).",
+        "Trace coverage is healthy. Review observation quality to ensure it captures meaningful state.",
+        {"step_count": step_count, "decision_count": decision_count, "avg_steps": pct},
+    )
+
+
+def _pl_pii_tracking(agent_name: str | None = None) -> CheckResult:
+    """PL.3 — PDPL/PII: are decisions that touch personal data flagged?"""
+    af, ap = _af(agent_name)
+    pii_count = _count(
+        f"SELECT COUNT(*) FROM pl_nodes WHERE node_type='Decision' AND contains_pii=TRUE{af}",
+        ap,
+    )
+    total = _count(
+        f"SELECT COUNT(*) FROM pl_nodes WHERE node_type='Decision'{af}",
+        ap,
+    )
+    class_count = _count(
+        f"""
+        SELECT COUNT(*) FROM pl_data_classifications
+        WHERE TRUE{' AND agent_name = %s' if agent_name else ''}
+        """,
+        (agent_name,) if agent_name else (),
+    )
+    if total == 0:
+        return CheckResult(NOT_MET, "No decisions recorded.", "Record decisions with contains_pii flag.", {})
+    if pii_count == 0 and class_count == 0:
+        return CheckResult(
+            NOT_MET,
+            "No PII flags or data classification records found.",
+            "Set contains_pii=true on decisions that process personal data; register data types in pl_data_classifications.",
+            {"pii_decisions": 0, "classifications": 0, "total_decisions": total},
+        )
+    if class_count == 0:
+        return CheckResult(
+            PARTIAL,
+            f"{pii_count}/{total} decisions flagged as PII but no formal data classification record exists.",
+            "Create a pl_data_classifications entry specifying PDPL data categories, retention, and encryption tier.",
+            {"pii_decisions": pii_count, "classifications": 0, "total_decisions": total},
+        )
+    return CheckResult(
+        MET,
+        f"{pii_count}/{total} decisions carry PII flag; {class_count} data classification record(s) registered.",
+        "Review classification records annually; ensure encryption tier matches data sensitivity.",
+        {"pii_decisions": pii_count, "classifications": class_count, "total_decisions": total},
+    )
+
+
+def _pl_agent_groups(agent_name: str | None = None) -> CheckResult:
+    """PL.4 — Cross-Agent Governance: are agents organised into accountable groups?"""
+    af, ap = _af(agent_name)
+    grouped = _count(
+        f"""
+        SELECT COUNT(DISTINCT agent_name) FROM pl_nodes
+        WHERE node_type='Decision' AND agent_group IS NOT NULL{af}
+        """,
+        ap,
+    )
+    total_agents = _count(
+        f"SELECT COUNT(DISTINCT agent_name) FROM pl_nodes WHERE node_type='Decision'{af}",
+        ap,
+    )
+    group_count = _count(
+        f"""
+        SELECT COUNT(DISTINCT agent_group) FROM pl_nodes
+        WHERE node_type='Decision' AND agent_group IS NOT NULL{af}
+        """,
+        ap,
+    )
+    if total_agents == 0:
+        return CheckResult(NOT_MET, "No agents with recorded decisions.", "Deploy agents and record decisions.", {})
+    if grouped == 0:
+        return CheckResult(
+            NOT_MET,
+            f"{total_agents} agent(s) active but none assigned to an agent_group.",
+            "Set agent_group on decisions (or in pl_agents) to enable cross-agent governance queries.",
+            {"grouped_agents": 0, "total_agents": total_agents, "groups": 0},
+        )
+    if grouped < total_agents:
+        return CheckResult(
+            PARTIAL,
+            f"{grouped}/{total_agents} agent(s) assigned to {group_count} group(s). {total_agents - grouped} ungrouped.",
+            "Assign all agents to a group; ungrouped agents are excluded from cross-agent governance queries.",
+            {"grouped_agents": grouped, "total_agents": total_agents, "groups": group_count},
+        )
+    return CheckResult(
+        MET,
+        f"All {total_agents} agent(s) organised into {group_count} group(s).",
+        "Confirm group definitions are documented with ownership and escalation paths.",
+        {"grouped_agents": grouped, "total_agents": total_agents, "groups": group_count},
+    )
+
+
+def _pl_cross_agent_edges(agent_name: str | None = None) -> CheckResult:
+    """PL.5 — End-to-end audit: are cross-agent decision links being recorded?"""
+    cross_count = _count(
+        "SELECT COUNT(*) FROM pl_edges WHERE edge_type = 'CROSS_AGENT_REFERENCE'",
+    )
+    if cross_count == 0:
+        return CheckResult(
+            NOT_MET,
+            "No cross-agent decision links recorded.",
+            "When one agent's decision influences another, call record_cross_agent_edge() or POST /api/v1/governance/links.",
+            {"cross_agent_edges": 0},
+        )
+    if cross_count < 5:
+        return CheckResult(
+            PARTIAL,
+            f"{cross_count} cross-agent edge(s) recorded — coverage may be incomplete.",
+            "Instrument all inter-agent handoffs with CROSS_AGENT_REFERENCE edges for full audit lineage.",
+            {"cross_agent_edges": cross_count},
+        )
+    return CheckResult(
+        MET,
+        f"{cross_count} cross-agent decision links recorded.",
+        "Review cross-agent edges quarterly to verify handoff accountability.",
+        {"cross_agent_edges": cross_count},
+    )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Requirement catalogue — 65 core + 5 ProofLayer extensions = 70 requirements
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _build_requirements(agent_name: str | None = None) -> list[Requirement]:
@@ -1284,6 +1483,12 @@ def _build_requirements(agent_name: str | None = None) -> list[Requirement]:
         Requirement("A.10.3","Annex A",   "Improvement",                             "Transparency and explainability",     "Make AI decisions transparent and explainable.", CRITICAL, bind(_a10_3)),
         Requirement("A.10.4","Annex A",   "Improvement",                             "Accountability",                      "Establish accountability for AI system outcomes.", CRITICAL, bind(_a10_4)),
         Requirement("A.10.5","Annex A",   "Improvement",                             "Privacy and security",                "Protect privacy and security in AI systems.", CRITICAL, bind(_a10_5)),
+        # ── v3 ProofLayer extensions ──────────────────────────────────────────
+        Requirement("PL.1",  "Annex A",   "A.9 AI System Lifecycle – Decision-Making", "Exception tracking",               "Record and justify every human policy exception with approver narrative.", CRITICAL, bind(_pl_exception_tracking)),
+        Requirement("PL.2",  "Annex A",   "A.9 AI System Lifecycle – Decision-Making", "Reasoning trace steps",            "Capture Thought->Action->Observation for each decision node.", MAJOR,    bind(_pl_trace_steps)),
+        Requirement("PL.3",  "Annex A",   "A.10.5 Privacy and security",               "PII data classification",          "Tag and classify decisions that process personal data.", CRITICAL, bind(_pl_pii_tracking)),
+        Requirement("PL.4",  "Annex A",   "A.3 Internal Organization",                 "Agent group governance",           "Organise agents into groups with defined accountability.", MAJOR,    bind(_pl_agent_groups)),
+        Requirement("PL.5",  "Clause 8",  "Operation",                                  "Cross-agent decision links",       "Link related decisions across agents to support end-to-end audit.", MAJOR, bind(_pl_cross_agent_edges)),
     ]
 
 
