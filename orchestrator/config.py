@@ -78,6 +78,27 @@ _DEFAULTS: dict[str, Any] = {
             "intents": ["cancellation_request", "downgrade_request", "competitor_mention",
                         "dissatisfaction", "win_back", "loyalty_inquiry"],
         },
+        {
+            "name": "complaints-agent", "group": "escalation",
+            "language": "en", "model": "deepseek/deepseek-chat",
+            "version": "1.0", "data_classification": "internal",
+            "intents": ["escalation", "regulatory_complaint", "service_grievance",
+                        "agent_complaint", "billing_complaint", "safety_concern"],
+        },
+        {
+            "name": "sales-agent", "group": "growth",
+            "language": "en", "model": "deepseek/deepseek-chat",
+            "version": "1.0", "data_classification": "internal",
+            "intents": ["upgrade_request", "promo_inquiry", "cross_sell",
+                        "plan_comparison", "lead_capture", "upsell_opportunity"],
+        },
+        {
+            "name": "loyalty-agent", "group": "growth",
+            "language": "en", "model": "deepseek/deepseek-chat",
+            "version": "1.0", "data_classification": "internal",
+            "intents": ["points_inquiry", "redemption_request", "tier_status",
+                        "benefit_inquiry", "points_transfer", "loyalty_complaint"],
+        },
     ],
     "routing": {
         "rules": [
@@ -116,6 +137,27 @@ _DEFAULTS: dict[str, Any] = {
             {"intent": "dissatisfaction",    "agent": "retention-agent",        "min_confidence": 0.85},
             {"intent": "win_back",           "agent": "retention-agent",        "min_confidence": 0.92},
             {"intent": "loyalty_inquiry",    "agent": "retention-agent",        "min_confidence": 0.87},
+            # escalation
+            {"intent": "escalation",             "agent": "complaints-agent",   "min_confidence": 0.88},
+            {"intent": "regulatory_complaint",   "agent": "complaints-agent",   "min_confidence": 0.92},
+            {"intent": "service_grievance",      "agent": "complaints-agent",   "min_confidence": 0.85},
+            {"intent": "agent_complaint",        "agent": "complaints-agent",   "min_confidence": 0.90},
+            {"intent": "billing_complaint",      "agent": "complaints-agent",   "min_confidence": 0.87},
+            {"intent": "safety_concern",         "agent": "complaints-agent",   "min_confidence": 0.96},
+            # growth — sales
+            {"intent": "upgrade_request",        "agent": "sales-agent",        "min_confidence": 0.88},
+            {"intent": "promo_inquiry",          "agent": "sales-agent",        "min_confidence": 0.90},
+            {"intent": "cross_sell",             "agent": "sales-agent",        "min_confidence": 0.83},
+            {"intent": "plan_comparison",        "agent": "sales-agent",        "min_confidence": 0.85},
+            {"intent": "lead_capture",           "agent": "sales-agent",        "min_confidence": 0.88},
+            {"intent": "upsell_opportunity",     "agent": "sales-agent",        "min_confidence": 0.82},
+            # growth — loyalty
+            {"intent": "points_inquiry",         "agent": "loyalty-agent",      "min_confidence": 0.90},
+            {"intent": "redemption_request",     "agent": "loyalty-agent",      "min_confidence": 0.92},
+            {"intent": "tier_status",            "agent": "loyalty-agent",      "min_confidence": 0.90},
+            {"intent": "benefit_inquiry",        "agent": "loyalty-agent",      "min_confidence": 0.87},
+            {"intent": "points_transfer",        "agent": "loyalty-agent",      "min_confidence": 0.90},
+            {"intent": "loyalty_complaint",      "agent": "loyalty-agent",      "min_confidence": 0.88},
             # Arabic contact-center
             {"intent": "ar_greeting",        "agent": "triage-agent-ar",        "min_confidence": 0.95},
             {"intent": "ar_password_reset",  "agent": "triage-agent-ar",        "min_confidence": 0.92},
