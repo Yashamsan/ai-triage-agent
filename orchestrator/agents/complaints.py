@@ -38,8 +38,18 @@ _SAFETY_SIGNALS = [
 class ComplaintsAgent(BaseSpecialistAgent):
     """Routes and resolves escalations, grievances, and regulatory complaints."""
 
-    version  = "1.0"
-    model_id = "deepseek/deepseek-chat"
+    version             = "1.0"
+    model_id            = "deepseek/deepseek-chat"
+    data_classification = "internal"
+    contains_pii        = False
+
+    _POLICIES: dict = {
+        "sla": {"critical": "1hr", "high": "4hr", "medium": "24hr", "low": "3_business_days"},
+        "safety_concern_overrides_all": True,
+        "regulatory_routes_to_compliance_channel": True,
+        "agent_misconduct_routes_to_hr_qa": True,
+        "regulatory_bodies": ["citc", "sama", "moci", "ombudsman"],
+    }
 
     @property
     def name(self) -> str: return "complaints-agent"

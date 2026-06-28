@@ -5,8 +5,9 @@
 -- ── pl_agents extensions ──────────────────────────────────────────────────────
 
 ALTER TABLE pl_agents
-    ADD COLUMN IF NOT EXISTS agent_group       TEXT,
-    ADD COLUMN IF NOT EXISTS data_classification TEXT DEFAULT 'internal';
+    ADD COLUMN IF NOT EXISTS agent_group          TEXT,
+    ADD COLUMN IF NOT EXISTS data_classification  TEXT DEFAULT 'internal',
+    ADD COLUMN IF NOT EXISTS description          TEXT DEFAULT '';
 
 -- ── pl_nodes extensions ───────────────────────────────────────────────────────
 

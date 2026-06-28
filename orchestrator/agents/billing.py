@@ -27,8 +27,18 @@ _FAILURE_FRAUD_LIMIT = 3       # payment failures before fraud signal
 class BillingAgent(BaseSpecialistAgent):
     """Resolves billing disputes, payment issues, and subscription changes."""
 
-    version  = "1.0"
-    model_id = "deepseek/deepseek-chat"
+    version             = "1.0"
+    model_id            = "deepseek/deepseek-chat"
+    contains_pii        = True
+    data_classification = "restricted"
+
+    _POLICIES: dict = {
+        "refund_auto_approve_max_sar":   _REFUND_AUTO_MAX,
+        "refund_manager_flag_max_sar":   _REFUND_MANAGER_MAX,
+        "refund_finance_workflow_above":  _REFUND_MANAGER_MAX,
+        "fraud_signal_after_n_failures": _FAILURE_FRAUD_LIMIT,
+        "billing_errors_over_90_days_escalate_compliance": True,
+    }
 
     @property
     def name(self) -> str: return "billing-agent"

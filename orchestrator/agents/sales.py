@@ -36,8 +36,17 @@ _PLANS: dict[str, dict] = {
 class SalesAgent(BaseSpecialistAgent):
     """Handles upgrades, promotions, cross-sell opportunities, and lead capture."""
 
-    version  = "1.0"
-    model_id = "deepseek/deepseek-chat"
+    version             = "1.0"
+    model_id            = "deepseek/deepseek-chat"
+    data_classification = "internal"
+    contains_pii        = False
+
+    _POLICIES: dict = {
+        "active_promos": {k: v["description"] for k, v in _PROMOS.items() if v["valid"]},
+        "upsell_blocked_for_at_risk_customers":  True,
+        "annual_discount_auto_apply_on_cost_mention": True,
+        "plans": list(_PLANS.keys()),
+    }
 
     @property
     def name(self) -> str: return "sales-agent"

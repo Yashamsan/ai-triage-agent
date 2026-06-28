@@ -565,6 +565,83 @@
     padding: 1px 5px;
   }
 
+  /* ── Agent catalog ── */
+  #agents-panel {
+    display: none;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 20px;
+    z-index: 10;
+  }
+  #agents-panel.active { display: block; }
+  .agents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .agent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .agent-card:hover { border-color: var(--accent); }
+  .agent-card.expanded { border-color: var(--accent); }
+  .ac-header { display: flex; align-items: flex-start; gap: 10px; }
+  .ac-icon {
+    width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; background: rgba(88,166,255,.1);
+  }
+  .ac-name { font-weight: 600; font-size: 13px; color: var(--text); }
+  .ac-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .ac-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .ac-intents { margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+  .intent-tag {
+    font-size: 10px;
+    background: rgba(63,185,80,.1);
+    color: var(--green);
+    border: 1px solid rgba(63,185,80,.25);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+  .badge-phi {
+    font-size: 9px; font-weight: 700;
+    background: rgba(248,81,73,.2); color: var(--red);
+    border: 1px solid rgba(248,81,73,.4); border-radius: 3px; padding: 1px 5px;
+  }
+  .badge-dc {
+    font-size: 9px;
+    background: rgba(210,153,34,.1); color: var(--yellow);
+    border: 1px solid rgba(210,153,34,.3); border-radius: 3px; padding: 1px 5px;
+  }
+  .badge-decisions {
+    font-size: 9px;
+    background: rgba(88,166,255,.1); color: var(--accent);
+    border: 1px solid rgba(88,166,255,.25); border-radius: 3px; padding: 1px 5px;
+  }
+  .ac-policies {
+    display: none; margin-top: 12px;
+    border-top: 1px solid var(--border); padding-top: 10px;
+  }
+  .agent-card.expanded .ac-policies { display: block; }
+  .policy-kv { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .policy-kv dt { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .policy-kv dd { font-size: 10px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-stats { display: flex; gap: 16px; margin-top: 8px; }
+  .ac-stat { text-align: center; }
+  .ac-stat-val { font-size: 15px; font-weight: 700; color: var(--accent); }
+  .ac-stat-label { font-size: 9px; color: var(--muted); }
+  #agents-header { display: flex; align-items: center; gap: 10px; }
+  #agents-back { font-size: 11px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  #agents-back:hover { color: var(--text); border-color: var(--text); }
+  .agents-title { font-size: 14px; font-weight: 600; }
+  .agents-sub { font-size: 11px; color: var(--muted); margin-left: 4px; }
+
   /* Print styles */
   @media print {
     body { background: white; color: black; font-size: 11px; height: auto; overflow: visible; }
@@ -602,10 +679,23 @@
     🔐 ISO 42001 <span class="grade grade-F" id="badge-grade">—</span> <span id="badge-pct" style="color:var(--muted)">—</span>
   </div>
   <button class="icon-btn" onclick="loadList()">↻ Refresh</button>
+  <button class="icon-btn" id="agents-btn" onclick="toggleAgentsView()">⊞ Agents</button>
   <span id="stats">—</span>
 </header>
 
 <main>
+  <!-- Agent catalog overlay (hidden by default) -->
+  <div id="agents-panel">
+    <div id="agents-header">
+      <button id="agents-back" onclick="toggleAgentsView()">← Back to Decisions</button>
+      <span class="agents-title">Agent Catalog</span>
+      <span class="agents-sub" id="agents-count"></span>
+    </div>
+    <div class="agents-grid" id="agents-grid">
+      <div class="loading">Loading agents…</div>
+    </div>
+  </div>
+
   <!-- Left: decision list -->
   <div id="list-panel">
     <div id="list-scroll">
@@ -875,6 +965,112 @@ const API = '';
 let currentId = null;
 let searchTimeout = null;
 let complianceLoaded = false;
+let agentsLoaded = false;
+
+// ── Agent catalog ──────────────────────────────────────────────────────────
+
+const GROUP_ICONS = {
+  'finance':       '💳',
+  'support':       '🔧',
+  'risk':          '🛡',
+  'retention':     '💼',
+  'escalation':    '⚠️',
+  'growth':        '📈',
+  'contact-center':'🏠',
+  'orchestrator':  '🔀',
+};
+
+function toggleAgentsView() {
+  const panel = document.getElementById('agents-panel');
+  const isActive = panel.classList.toggle('active');
+  document.getElementById('agents-btn').textContent = isActive ? '✕ Close' : '⊞ Agents';
+  if (isActive && !agentsLoaded) loadAgents();
+}
+
+async function loadAgents() {
+  const grid = document.getElementById('agents-grid');
+  grid.innerHTML = '<div class="loading">Loading agents…</div>';
+  try {
+    const agents = await apiFetch('/api/v1/agents');
+    agentsLoaded = true;
+    document.getElementById('agents-count').textContent =
+      `${agents.length} registered`;
+    if (!agents.length) {
+      grid.innerHTML = '<div class="loading">No agents registered. Run the demo script first.</div>';
+      return;
+    }
+    grid.innerHTML = agents.map(renderAgentCard).join('');
+  } catch (e) {
+    grid.innerHTML = `<div class="loading" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+function renderAgentCard(a) {
+  const meta        = a.metadata || {};
+  const intents     = (meta.intents || []);
+  const policies    = meta.policies || {};
+  const containsPii = meta.contains_pii || false;
+  const dc          = a.data_classification || 'internal';
+  const icon        = GROUP_ICONS[a.agent_group] || '🤖';
+  const avgConf     = a.avg_confidence != null ? `${Math.round(a.avg_confidence * 100)}%` : '—';
+
+  const intentTags = intents.slice(0, 6)
+    .map(i => `<span class="intent-tag">${i.replace(/_/g,' ')}</span>`)
+    .join('') + (intents.length > 6
+      ? `<span class="intent-tag" style="background:rgba(139,148,158,.1);color:var(--muted)">+${intents.length - 6} more</span>`
+      : '');
+
+  const policyRows = Object.entries(policies).slice(0, 8).map(([k, v]) => {
+    const vstr = typeof v === 'object' ? JSON.stringify(v).slice(0, 60) : String(v);
+    return `<dt title="${k}">${k.replace(/_/g,' ')}</dt><dd title="${vstr}">${vstr}</dd>`;
+  }).join('');
+
+  const dcColor = dc === 'phi' ? 'var(--red)'
+    : dc === 'restricted'  ? 'var(--orange)'
+    : dc === 'confidential'? 'var(--yellow)'
+    : 'var(--muted)';
+
+  return `<div class="agent-card" onclick="this.classList.toggle('expanded')">
+    <div class="ac-header">
+      <div class="ac-icon">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="ac-name">${a.agent_name}</div>
+        <div class="ac-desc">${a.description || a.agent_group || ''}</div>
+        <div class="ac-badges">
+          ${a.agent_group ? `<span class="group-pill">${a.agent_group}</span>` : ''}
+          ${containsPii ? `<span class="badge-phi">PII</span>` : ''}
+          <span class="badge-dc" style="color:${dcColor};border-color:${dcColor}40;background:${dcColor}12">${dc}</span>
+          <span class="badge-decisions">${a.decision_count} decisions</span>
+          ${a.avg_confidence != null ? `<span class="badge-trace">avg ${avgConf}</span>` : ''}
+        </div>
+      </div>
+    </div>
+    ${intentTags ? `<div class="ac-intents">${intentTags}</div>` : ''}
+    ${policyRows ? `
+    <div class="ac-policies">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Policy Limits</div>
+      <dl class="policy-kv">${policyRows}</dl>
+    </div>` : ''}
+    <div class="ac-stats">
+      <div class="ac-stat">
+        <div class="ac-stat-val">${intents.length}</div>
+        <div class="ac-stat-label">intents</div>
+      </div>
+      <div class="ac-stat">
+        <div class="ac-stat-val">${a.decision_count}</div>
+        <div class="ac-stat-label">decisions</div>
+      </div>
+      ${a.avg_confidence != null ? `<div class="ac-stat">
+        <div class="ac-stat-val">${avgConf}</div>
+        <div class="ac-stat-label">avg conf</div>
+      </div>` : ''}
+      <div class="ac-stat">
+        <div class="ac-stat-val">${a.agent_version}</div>
+        <div class="ac-stat-label">version</div>
+      </div>
+    </div>
+  </div>`;
+}
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 

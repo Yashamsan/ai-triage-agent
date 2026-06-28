@@ -56,6 +56,16 @@ class TechnicalAgent(BaseSpecialistAgent):
         ],
     }
 
+    data_classification = "internal"
+    contains_pii        = False
+
+    _POLICIES: dict = {
+        "p1_auto_incident_ticket":           True,
+        "p1_triggers_sla_credit":            True,
+        "hw_replacement_requires_l2_approval": True,
+        "sev_levels":                        {"P1": "1hr", "P2": "4hr", "P3": "24hr"},
+    }
+
     # ── Severity / SLA helpers ────────────────────────────────────────────
 
     _P1_SIGNALS   = ["production", "all users", "completely", "3 hours", "critical", "p1", "urgent", "emergency"]

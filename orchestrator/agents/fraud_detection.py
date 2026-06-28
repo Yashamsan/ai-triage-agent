@@ -68,8 +68,21 @@ _AMOUNT_RE = re.compile(r"(?:sar|£|\$|€|usd)?\s*(\d[\d,]*(?:\.\d{1,2})?)", re
 class FraudDetectionAgent(BaseSpecialistAgent):
     """Risk scoring and response for suspected fraud and account security incidents."""
 
-    version  = "1.0"
-    model_id = "deepseek/deepseek-chat"
+    version             = "1.0"
+    model_id            = "deepseek/deepseek-chat"
+    contains_pii        = True
+    data_classification = "phi"
+
+    _POLICIES: dict = {
+        "block_threshold_pct":   int(_BLOCK_THRESHOLD * 100),
+        "review_threshold_pct":  int(_REVIEW_THRESHOLD * 100),
+        "risk_weights":          dict(_WEIGHTS),
+        "high_value_sar":        _HIGH_VALUE_THRESHOLD,
+        "critical_amount_sar":   _CRITICAL_THRESHOLD,
+        "known_patterns":        list(_PATTERNS.keys()),
+        "cross_agent_billing_amplifier": True,
+        "phi_classification": True,
+    }
 
     @property
     def name(self) -> str: return "fraud-detection-agent"

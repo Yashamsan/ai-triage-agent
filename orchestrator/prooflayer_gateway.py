@@ -66,13 +66,30 @@ class ProofLayerGateway:
         group: str,
         model_id: str,
         version: str = "1.0",
+        intents: list[str] | None = None,
+        contains_pii: bool = False,
+        data_classification: str = "internal",
+        policies: dict | None = None,
+        description: str = "",
     ) -> dict:
-        """Register an agent in the ProofLayer node registry."""
-        return self._post("/register-agent", {
-            "agent_name":  name,
-            "agent_group": group,
-            "model_id":    model_id,
-            "version":     version,
+        """Register an agent with its full behavioral contract.
+
+        All behavioral metadata (intents, policies, PII flag) is stored in
+        `pl_agents.metadata` so the governance dashboard can display what each
+        agent can do without reading source code.
+        """
+        return self._post("/agents", {
+            "agent_name":         name,
+            "agent_version":      version,
+            "model_id":           model_id,
+            "agent_group":        group,
+            "description":        description or f"{name} ({group} group)",
+            "data_classification": data_classification,
+            "metadata": {
+                "intents":      intents or [],
+                "contains_pii": contains_pii,
+                "policies":     policies or {},
+            },
         })
 
     # ── Decision recording ────────────────────────────────────────────────

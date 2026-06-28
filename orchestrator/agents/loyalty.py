@@ -46,8 +46,20 @@ def _next_tier(current: str) -> str | None:
 class LoyaltyAgent(BaseSpecialistAgent):
     """Manages points balances, tier status, redemptions, and loyalty benefits."""
 
-    version  = "1.0"
-    model_id = "deepseek/deepseek-chat"
+    version             = "1.0"
+    model_id            = "deepseek/deepseek-chat"
+    data_classification = "internal"
+    contains_pii        = False
+
+    _POLICIES: dict = {
+        "tiers": {k: {"min_points": v["min_points"], "multiplier": v["multiplier"]}
+                  for k, v in _TIERS.items()},
+        "points_to_sar_rate":      _POINTS_TO_SAR,
+        "min_redeem_points":       _MIN_REDEEM,
+        "transfer_cap_pct":        int(_TRANSFER_CAP * 100),
+        "expiry_months_inactivity": 24,
+        "tier_qualification_months": 3,
+    }
 
     @property
     def name(self) -> str: return "loyalty-agent"

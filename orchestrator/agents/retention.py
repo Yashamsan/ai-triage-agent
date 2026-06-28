@@ -68,8 +68,20 @@ def _customer_segment(session_id: str) -> str:
 class RetentionAgent(BaseSpecialistAgent):
     """Prevents churn by generating personalised save offers with cross-agent context."""
 
-    version  = "1.0"
-    model_id = "deepseek/deepseek-chat"
+    version             = "1.0"
+    model_id            = "deepseek/deepseek-chat"
+    contains_pii        = True
+    data_classification = "confidential"
+
+    _POLICIES: dict = {
+        "save_offers": {seg: {"discount_pct": int(v["discount"] * 100),
+                               "free_months":   v["free_months"],
+                               "ltv_threshold_sar": v["threshold_sar"]}
+                        for seg, v in _SAVE_OFFERS.items()},
+        "cross_agent_churn_amplification": True,
+        "competitor_match_requires_pricing_approval": True,
+        "win_back_free_months": 2,
+    }
 
     @property
     def name(self) -> str: return "retention-agent"

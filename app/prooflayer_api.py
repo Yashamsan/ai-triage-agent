@@ -76,6 +76,10 @@ class AgentOut(BaseModel):
     data_classification: str | None = None
     registered_at: str
     last_seen: str
+    description: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    decision_count: int = 0
+    avg_confidence: float | None = None
 
 
 class TraceStepIn(BaseModel):
@@ -208,14 +212,35 @@ def list_agents():
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         """
-        SELECT agent_id, agent_name, agent_version, model_id,
-               agent_group, data_classification, registered_at, last_seen
-        FROM pl_agents ORDER BY last_seen DESC LIMIT 100
+        SELECT a.agent_id, a.agent_name, a.agent_version, a.model_id,
+               a.agent_group, a.data_classification, a.registered_at, a.last_seen,
+               a.description, a.metadata,
+               COUNT(n.node_id)                                       AS decision_count,
+               AVG((n.properties->>'confidence_score')::float)        AS avg_confidence
+        FROM pl_agents a
+        LEFT JOIN pl_nodes n
+               ON n.agent_name = a.agent_name AND n.node_type = 'Decision'
+        GROUP BY a.agent_id, a.agent_name, a.agent_version, a.model_id,
+                 a.agent_group, a.data_classification, a.registered_at,
+                 a.last_seen, a.description, a.metadata
+        ORDER BY a.last_seen DESC
+        LIMIT 100
         """
     )
     rows = cur.fetchall()
     cur.close()
     conn.close()
+
+    def _parse_meta(raw: Any) -> dict:
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {}
+        return {}
+
     return [
         AgentOut(
             agent_id=str(r["agent_id"]),
@@ -226,12 +251,18 @@ def list_agents():
             data_classification=r.get("data_classification"),
             registered_at=r["registered_at"].isoformat(),
             last_seen=r["last_seen"].isoformat(),
+            description=r.get("description") or "",
+            metadata=_parse_meta(r.get("metadata")),
+            decision_count=int(r.get("decision_count") or 0),
+            avg_confidence=round(float(r["avg_confidence"]), 3) if r.get("avg_confidence") else None,
         )
         for r in rows
     ]
 
 
-# NOTE: /agents/active must be declared BEFORE /agents/{id}
+# NOTE: literal paths /agents/active and /agents/{name} must stay before any
+# parametric route to avoid FastAPI shadowing them.
+
 @router.get("/agents/active")
 def list_active_agents():
     """Distinct agent names that have at least one recorded Decision node."""
@@ -249,6 +280,61 @@ def list_active_agents():
     cur.close()
     conn.close()
     return names
+
+
+@router.get("/agents/{agent_name}", response_model=AgentOut)
+def get_agent(agent_name: str):
+    """Full agent profile including behavior metadata and decision statistics."""
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        """
+        SELECT a.agent_id, a.agent_name, a.agent_version, a.model_id,
+               a.agent_group, a.data_classification, a.registered_at, a.last_seen,
+               a.description, a.metadata,
+               COUNT(n.node_id)                                AS decision_count,
+               AVG((n.properties->>'confidence_score')::float) AS avg_confidence
+        FROM pl_agents a
+        LEFT JOIN pl_nodes n
+               ON n.agent_name = a.agent_name AND n.node_type = 'Decision'
+        WHERE a.agent_name = %s
+        GROUP BY a.agent_id, a.agent_name, a.agent_version, a.model_id,
+                 a.agent_group, a.data_classification, a.registered_at,
+                 a.last_seen, a.description, a.metadata
+        """,
+        (agent_name,),
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not registered")
+
+    def _parse_meta(raw: Any) -> dict:
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {}
+        return {}
+
+    return AgentOut(
+        agent_id=str(row["agent_id"]),
+        agent_name=row["agent_name"],
+        agent_version=row["agent_version"],
+        model_id=row["model_id"],
+        agent_group=row.get("agent_group"),
+        data_classification=row.get("data_classification"),
+        registered_at=row["registered_at"].isoformat(),
+        last_seen=row["last_seen"].isoformat(),
+        description=row.get("description") or "",
+        metadata=_parse_meta(row.get("metadata")),
+        decision_count=int(row.get("decision_count") or 0),
+        avg_confidence=round(float(row["avg_confidence"]), 3) if row.get("avg_confidence") else None,
+    )
 
 
 # ============================================================================

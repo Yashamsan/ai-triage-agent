@@ -9,10 +9,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from langgraph.graph import END, StateGraph
-from typing import TypedDict
 
 if TYPE_CHECKING:
     from orchestrator.prooflayer_gateway import ProofLayerGateway
@@ -66,18 +65,28 @@ class BaseSpecialistAgent(ABC):
             Must return at minimum: response_text
 
     Subclasses MAY override:
-        model_id      class attribute
-        version       class attribute
-        _build_graph  to add nodes (e.g. tool_runner, reflection)
+        version              class attribute (str)
+        model_id             class attribute (str)
+        contains_pii         class attribute (bool) — default False
+        data_classification  class attribute (str)  — default "internal"
+        _KEYWORDS            class attribute (dict[intent → keyword list])
+        _POLICIES            class attribute (dict[rule → value])
+        _build_graph         to add nodes (e.g. tool_runner, reflection)
     """
 
-    version:  str = "1.0"
-    model_id: str = "deepseek/deepseek-chat"
+    version:             str  = "1.0"
+    model_id:            str  = "deepseek/deepseek-chat"
+    contains_pii:        bool = False
+    data_classification: str  = "internal"
+
+    # Subclasses define these; base provides safe empty defaults for introspection
+    _KEYWORDS: dict[str, list[str]] = {}
+    _POLICIES: dict[str, Any]       = {}
 
     def __init__(
         self,
         config: dict[str, Any] | None = None,
-        gateway: "ProofLayerGateway | None" = None,
+        gateway: ProofLayerGateway | None = None,
     ) -> None:
         self._config  = config or {}
         self._gateway = gateway
@@ -195,6 +204,25 @@ class BaseSpecialistAgent(ABC):
             "observation": observation,
             "confidence":  confidence,
             "latency_ms":  latency_ms,
+        }
+
+    def behavior_profile(self) -> dict[str, Any]:
+        """Return the agent's behavioral contract for ProofLayer registration.
+
+        ProofLayer stores this in `pl_agents.metadata` so the governance
+        dashboard can display what each agent can do, what data it touches,
+        and what hard policy limits it enforces — without having to read source.
+        """
+        cls = self.__class__
+        intents = list(getattr(cls, "_KEYWORDS", {}).keys())
+        return {
+            "intents":             intents,
+            "contains_pii":        self.contains_pii,
+            "data_classification": self.data_classification,
+            "policies":            dict(getattr(cls, "_POLICIES", {})),
+            "model_id":            self.model_id,
+            "group":               self.group,
+            "version":             self.version,
         }
 
     def __repr__(self) -> str:

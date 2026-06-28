@@ -12,17 +12,15 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 import litellm
 from langfuse import observe
 from langgraph.graph import END, StateGraph
-from typing import TypedDict
 
 from orchestrator.config import get_routing_table
 from orchestrator.memory_bridge import MemoryBridge
 from orchestrator.prooflayer_gateway import ProofLayerGateway
-
 
 # ── Router LangGraph state ────────────────────────────────────────────────────
 
@@ -103,15 +101,32 @@ class RouterAgent:
     # ── Agent registry ────────────────────────────────────────────────────
 
     def load_agents(self, agents: list) -> None:
-        """Register specialist agents. Must be called before routing."""
+        """Register specialist agents with their full behavior profiles.
+
+        Each agent's `behavior_profile()` is sent to ProofLayer so the CISO
+        dashboard can display what every agent handles, what data it touches,
+        and what hard policy limits it enforces.
+        """
         for agent in agents:
             self.agents[agent.name] = agent
             try:
+                profile = agent.behavior_profile()
+                intents = profile.get("intents", [])
+                desc = (
+                    f"{agent.name} ({agent.group}) — "
+                    f"handles: {', '.join(intents[:4])}"
+                    + (f" +{len(intents)-4} more" if len(intents) > 4 else "")
+                )
                 self.gateway.register_agent(
                     name=agent.name,
                     group=agent.group,
                     model_id=agent.model_id,
                     version=getattr(agent, "version", "1.0"),
+                    intents=intents,
+                    contains_pii=profile.get("contains_pii", False),
+                    data_classification=profile.get("data_classification", "internal"),
+                    policies=profile.get("policies", {}),
+                    description=desc,
                 )
             except Exception as exc:
                 print(f"  [Router] register {agent.name}: {exc}")
