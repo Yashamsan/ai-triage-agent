@@ -25,7 +25,7 @@ ALTER TABLE pl_edges
 
 CREATE TABLE IF NOT EXISTS pl_trace_steps (
     step_id         BIGSERIAL PRIMARY KEY,
-    decision_node_id BIGINT    NOT NULL REFERENCES pl_nodes(node_id) ON DELETE CASCADE,
+    decision_node_id UUID      NOT NULL REFERENCES pl_nodes(node_id) ON DELETE CASCADE,
     step_order      INT        NOT NULL DEFAULT 0,
     node_type       TEXT       NOT NULL,   -- classifier / reflect / tool_runner / …
     thought         TEXT,
