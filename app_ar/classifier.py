@@ -1,4 +1,4 @@
-"""Arabic LLM classifier -- Qwen3.5 via OpenRouter."""
+"""Arabic LLM classifier — Qwen via OpenRouter with LiteLLM proxy fallback."""
 
 from dotenv import load_dotenv
 
@@ -48,9 +48,27 @@ class ClassifierOutput(BaseModel):
 
 @observe(name="classify_ar", as_type="generation")
 def classify_ar(message: str) -> ClassifierOutput:
-    """Classify an Arabic customer message using Qwen3.5 via OpenRouter."""
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    model = os.getenv("AR_LLM_MODEL", "openrouter/qwen/qwen3.5-27b")
+    """Classify an Arabic customer message. Uses LiteLLM proxy if configured, else OpenRouter."""
+    proxy_url = os.getenv("LITELLM_PROXY_URL")
+    proxy_key = os.getenv("LITELLM_MASTER_KEY")
+
+    if proxy_url:
+        # Route through internal LiteLLM proxy (same as English agent)
+        model = os.getenv("AR_LLM_MODEL", "cheap-classifier")
+        call_kwargs: dict = {
+            "model": model,
+            "api_base": proxy_url,
+            "api_key": proxy_key,
+        }
+    else:
+        # Direct OpenRouter call for Qwen
+        model = os.getenv("AR_LLM_MODEL", "openrouter/qwen/qwen3-235b-a22b")
+        call_kwargs = {
+            "model": model,
+            "api_base": "https://openrouter.ai/api/v1",
+            "api_key": os.getenv("OPENROUTER_API_KEY"),
+            "extra_body": {"thinking": {"type": "disabled"}},
+        }
 
     safe_message = f"<untrusted_input>\n{message}\n</untrusted_input>"
     messages = [
@@ -58,18 +76,19 @@ def classify_ar(message: str) -> ClassifierOutput:
         {"role": "user", "content": safe_message},
     ]
 
-    llm_response = litellm.completion(
-        model=model,
-        messages=messages,
-        temperature=0,
-        max_tokens=500,
-        api_base="https://openrouter.ai/api/v1",
-        api_key=api_key,
-        extra_body={"thinking": {"type": "disabled"}},
-    )
-    raw = llm_response.choices[0].message.content
-    if not raw:
-        raise ValueError("Empty response from model — thinking mode may have consumed all tokens")
+    try:
+        llm_response = litellm.completion(
+            messages=messages,
+            temperature=0,
+            max_tokens=500,
+            request_timeout=90,
+            **call_kwargs,
+        )
+    except Exception as exc:
+        print(f"[Classifier AR] LLM call failed: {exc}")
+        return ClassifierOutput(intent="unknown", confidence=0.0, needs_escalation=False)
+
+    raw = llm_response.choices[0].message.content or ""
     if "<think>" in raw:
         raw = raw.split("</think>", 1)[-1].strip()
 
@@ -94,8 +113,13 @@ def classify_ar(message: str) -> ClassifierOutput:
     except Exception:
         pass
 
-    data = json.loads(raw)
-    result = ClassifierOutput(**data)
+    try:
+        data = json.loads(raw)
+        result = ClassifierOutput(**data)
+    except Exception as exc:
+        print(f"[Classifier AR] Parse error: {exc} | raw={raw[:200]}")
+        return ClassifierOutput(intent="unknown", confidence=0.0, needs_escalation=False)
+
     if result.intent not in VALID_INTENTS:
         result.intent = "unknown"
     return result

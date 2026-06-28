@@ -1,4 +1,10 @@
-"""Arabic-capable embedding via sentence-transformers (multilingual)."""
+"""Embeddings for Arabic agent — uses same model as English so vector spaces match.
+
+Both agents share the same faq_articles table whose embeddings were generated
+with all-MiniLM-L6-v2. Using a different model here would put Arabic queries
+in a different vector space and break similarity search against that data.
+Switch to a multilingual model only after reseeding faq_articles with it.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +16,7 @@ if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer as _ST
 
 _model: _ST | None = None
-MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+MODEL_NAME = "all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384
 
 

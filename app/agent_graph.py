@@ -16,11 +16,11 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 
 from app.classifier import classify
-from app.memory import get_session
-from app.precedent_store import find_precedent, store_trace
 from app.reflection import reflect as reflection_check
 from app.response_generator import generate_response
 from app.tools import run_tool
+from shared.memory import get_session
+from shared.precedent_store import find_precedent, store_trace
 
 checkpointer = InMemorySaver()
 

@@ -9,7 +9,7 @@ Mirrors app/agent_graph.py Week 7 architecture; Arabic-specific:
   - Shared memory and precedent_store (sessions prefixed ar_ in main.py)
 """
 
-from typing import Literal, Optional, TypedDict
+from typing import Literal, TypedDict
 
 from langfuse import observe
 from langgraph.checkpoint.memory import InMemorySaver
@@ -19,8 +19,8 @@ from app_ar.classifier import classify_ar
 from app_ar.reflection import reflect as reflection_check
 from app_ar.response_generator import generate_response_ar
 from app_ar.tools import run_tool
-from app.memory import get_session
-from app.precedent_store import find_precedent, store_trace
+from shared.memory import get_session
+from shared.precedent_store import find_precedent, store_trace
 
 checkpointer = InMemorySaver()
 
@@ -30,16 +30,16 @@ checkpointer = InMemorySaver()
 class AgentState(TypedDict):
     # Input
     message: str
-    session_id: Optional[str]
+    session_id: str | None
     # Classifier output
     intent: str
     confidence: float
     needs_escalation: bool
     # Reflection output
     needs_revision: bool
-    revised_intent: Optional[str]
+    revised_intent: str | None
     revised_confidence: float
-    critique: Optional[str]
+    critique: str | None
     # Tool output
     tool_output: str
     resolved: bool
@@ -163,7 +163,7 @@ def store_memory_node(state: AgentState) -> dict:
     }
     try:
         store_trace(trace)
-    except Exception as e:
+    except Exception:
         pass
 
     session = get_session(state.get("session_id") or "ar_default")

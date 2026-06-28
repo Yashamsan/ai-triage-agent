@@ -21,30 +21,28 @@ class ToolResult:
     resolved: bool  # True = fully answered, False = needs escalation
 
 
+_FALLBACKS = {
+    "password_reset": (
+        "لإعادة تعيين كلمة المرور، تفضل بزيارة صفحة تسجيل الدخول وانقر على 'نسيت كلمة المرور'. "
+        "سيتم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني (صالح لمدة 30 دقيقة). "
+        "إذا لم يصلك البريد، تحقق من مجلد الرسائل غير المرغوب فيها."
+    ),
+    "billing": (
+        "للاستفسارات المتعلقة بالفواتير، يرجى تسجيل الدخول وزيارة الحساب ← الفواتير، "
+        "أو مراسلتنا على billing@support.example.com. "
+        "نعالج طلبات استرداد المبالغ المالية خلال 5-7 أيام عمل."
+    ),
+    "technical_support": (
+        "حاول مسح ذاكرة التخزين المؤقت وملفات تعريف الارتباط (Cache & Cookies)، "
+        "ثم تحقق من status.example.com لمعرفة الحوادث الحالية. "
+        "إذا استمرت المشكلة، سيقوم فريقنا الفني بالتحقيق."
+    ),
+}
+
+
 @observe(name="faq_lookup_ar")
 def faq_lookup(intent: str, user_message: str) -> ToolResult:
-    """Find the best matching Arabic FAQ article via vector similarity search."""
-    fallbacks = {
-        "password_reset": (
-            "لإعادة تعيين كلمة المرور، تفضل بزيارة صفحة تسجيل الدخول وانقر على 'نسيت كلمة المرور'. "
-            "سيتم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني (صالحة لمدة 30 دقيقة). "
-            "إذا لم يصلك البريد، تحقق من مجلد الرسائل غير المرغوب فيها."
-        ),
-        "billing": (
-            "للاستفسارات المتعلقة بالفواتير، يرجى تسجيل الدخول وزيارة الحساب ← الفواتير، "
-            "أو مراسلتنا على billing@support.example.com. "
-            "نعالج طلبات استرداد المبالغ المالية خلال 5-7 أيام عمل."
-        ),
-        "technical_support": (
-            "حاول مسح ذاكرة التخزين المؤقت وملفات تعريف الارتباط (Cache & Cookies)، "
-            "ثم تحقق من status.example.com لمعرفة الحوادث الحالية. "
-            "إذا استمرت المشكلة، سيقوم فريقنا الفني بالتحقيق."
-        ),
-    }
-    content = fallbacks.get(intent)
-    if content:
-        return ToolResult(success=True, data=content, resolved=True)
-
+    """Find the best matching FAQ article — DB first, Arabic hardcoded fallback second."""
     metrics = RetrievalMetricsLogger()
     try:
         with metrics.trace_latency("embedding"):
@@ -64,6 +62,10 @@ def faq_lookup(intent: str, user_message: str) -> ToolResult:
             )
     except Exception:
         pass
+
+    content = _FALLBACKS.get(intent)
+    if content:
+        return ToolResult(success=True, data=content, resolved=True)
 
     return ToolResult(success=False, data="لم يتم العثور على مقالة مناسبة.", resolved=False)
 
