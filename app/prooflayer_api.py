@@ -32,6 +32,7 @@ from app.prooflayer_graph import (
     get_audit_report,
     get_trace,
     query_cross_agent,
+    record_cross_agent_edge,
     record_decision,
     record_exception,
 )
@@ -391,6 +392,32 @@ def append_trace_step(req: TraceStepRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return result
+
+
+# ============================================================================
+# v3: Cross-Agent Edge
+# ============================================================================
+
+
+class CrossAgentEdgeRequest(BaseModel):
+    from_decision_id: str
+    to_decision_id: str
+    relationship: str = "CROSS_AGENT_REFERENCE"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/cross-agent-edge", status_code=201)
+def create_cross_agent_edge(req: CrossAgentEdgeRequest):
+    try:
+        edge_id = record_cross_agent_edge(
+            from_decision_id=req.from_decision_id,
+            to_decision_id=req.to_decision_id,
+            relationship=req.relationship,
+            metadata=req.metadata,
+        )
+        return {"edge_id": edge_id, "relationship": req.relationship}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # ============================================================================

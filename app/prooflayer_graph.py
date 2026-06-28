@@ -246,7 +246,7 @@ def record_exception(
         RETURNING exception_id, created_at
         """,
         (
-            int(decision_node_id),
+            decision_node_id,
             human_narrative,
             approver,
             approval_channel,
@@ -287,7 +287,7 @@ def record_exception(
                 %s)
         """,
         (
-            int(decision_node_id),
+            decision_node_id,
             exc_node_id,
             json.dumps({"severity": severity, "approver": approver}),
         ),
@@ -328,7 +328,7 @@ def add_trace_step(
         cur.execute(
             "SELECT COALESCE(MAX(step_order), -1) + 1 AS next_order "
             "FROM pl_trace_steps WHERE decision_node_id = %s",
-            (int(decision_node_id),),
+            (decision_node_id,),
         )
         step_order = cur.fetchone()["next_order"]
 
@@ -341,7 +341,7 @@ def add_trace_step(
         RETURNING step_id, created_at
         """,
         (
-            int(decision_node_id),
+            decision_node_id,
             step_order,
             node_type,
             thought,
@@ -375,7 +375,7 @@ def get_trace(decision_node_id: str | int) -> list[dict]:
         WHERE decision_node_id = %s
         ORDER BY step_order
         """,
-        (int(decision_node_id),),
+        (decision_node_id,),
     )
     rows = cur.fetchall()
     cur.close()
@@ -423,7 +423,7 @@ def record_context_snapshot(
         RETURNING context_id, captured_at
         """,
         (
-            int(decision_node_id),
+            decision_node_id,
             model_version,
             json.dumps(active_policies or []),
             json.dumps(risk_scores or {}),
@@ -462,8 +462,8 @@ def record_cross_agent_edge(
         RETURNING edge_id, valid_from
         """,
         (
-            int(from_decision_id),
-            int(to_decision_id),
+            from_decision_id,
+            to_decision_id,
             relationship,
             json.dumps(metadata or {}),
         ),

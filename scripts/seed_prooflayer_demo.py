@@ -216,7 +216,7 @@ else:
 
 EXCEPTIONS = [
     {
-        "decision_node_id": _did(8),  # escalation
+        "decision_id": _did(8),  # escalation
         "human_narrative": (
             "Customer called three times in two hours about unresolved billing dispute. "
             "Auto-escalation threshold not yet met but agent judgment indicated imminent churn risk. "
@@ -229,7 +229,7 @@ EXCEPTIONS = [
         "severity":         "low",
     },
     {
-        "decision_node_id": _did(5),  # refund_approved
+        "decision_id": _did(5),  # refund_approved
         "human_narrative": (
             "Refund of SAR 890 approved outside 30-day policy window. "
             "Customer provided supplier invoice proving delayed delivery caused by system outage on our side. "
@@ -242,7 +242,7 @@ EXCEPTIONS = [
         "severity":         "medium",
     },
     {
-        "decision_node_id": _did(6),  # block_transaction — the fraud story
+        "decision_id": _did(6),  # block_transaction — the fraud story
         "human_narrative": (
             "Fraud model blocked SAR 12,450 international wire at 55% confidence. "
             "Manual investigation confirmed: customer pre-notified operations team 3 days prior, "
@@ -260,7 +260,7 @@ EXCEPTIONS = [
 
 print(f"\n💬 Recording {len(EXCEPTIONS)} human exceptions (ghost knowledge)...")
 for ex in EXCEPTIONS:
-    if not ex["decision_node_id"]:
+    if not ex["decision_id"]:
         print(f"  ⚠  Skipping {ex['policy_violated']} — decision not recorded")
         continue
     try:
