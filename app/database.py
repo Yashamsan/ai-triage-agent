@@ -57,6 +57,23 @@ def apply_schema_v2() -> None:
         conn.commit()
 
 
+def apply_schema_v3() -> None:
+    """Run app/schema_v3.sql — ProofLayer v3 tables and governance indexes.
+
+    Adds pl_trace_steps, pl_exceptions, pl_decision_contexts, pl_policies,
+    pl_policy_agent_map, pl_data_classifications, and governance indexes.
+    No-op if schema_v3.sql is not present.
+    """
+    sql_path = Path(__file__).parent / "schema_v3.sql"
+    if not sql_path.exists():
+        return
+    sql = sql_path.read_text()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+
+
 # ── FAQ queries ───────────────────────────────────────────────────────
 
 def find_faq(intent: str, embedding: list[float]) -> dict | None:

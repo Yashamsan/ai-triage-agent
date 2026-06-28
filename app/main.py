@@ -32,11 +32,16 @@ app.include_router(prooflayer_router)
 
 @app.on_event("startup")
 def _startup() -> None:
-    from app.database import apply_schema_v2
+    from app.database import apply_schema_v2, apply_schema_v3
     try:
         apply_schema_v2()
     except Exception as exc:
         print(f"[startup] schema_v2 migration skipped: {exc}")
+    try:
+        apply_schema_v3()
+        print("[startup] schema_v3 applied")
+    except Exception as exc:
+        print(f"[startup] schema_v3 migration skipped: {exc}")
     try:
         from app.embeddings import embed
         embed("warmup")
