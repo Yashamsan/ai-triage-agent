@@ -4,13 +4,31 @@ Wraps the ProofLayer REST API (running at prooflayer_url, typically
 http://localhost:8000) so every router decision and every agent decision
 lands in the single CISO dashboard without agents depending on each other.
 
-All methods are fire-and-log: a ProofLayer outage never crashes the agents.
+All public methods are fire-and-log: a ProofLayer outage never crashes the
+agents.
+
+local_mode=True
+    No HTTP calls are made. All decisions, agents, edges, and exceptions are
+    stored in-process (lists on the gateway instance). Useful for demos,
+    integration tests, and development without Docker.
+
+    Enable via config:
+        orchestrator:
+          local_mode: true
+
+    Or at construction:
+        gw = ProofLayerGateway(cfg, local_mode=True)
+
+    Inspect the in-memory store:
+        gw.local_store()  → {"agents": [...], "decisions": [...], ...}
 """
 from __future__ import annotations
 
 import json
 import urllib.error
 import urllib.request
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -21,16 +39,37 @@ class ProofLayerGateway:
         gw = ProofLayerGateway(config)
         result = gw.record_decision(agent_name="billing-agent", ...)
         gw.record_cross_agent_edge(from_id=router_did, to_id=agent_did)
+
+    Local mode (no Docker required):
+        gw = ProofLayerGateway(config, local_mode=True)
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
-        base = config.get("orchestrator", {}).get("prooflayer_url", "http://localhost:8000")
+    def __init__(
+        self,
+        config: dict[str, Any],
+        local_mode: bool | None = None,
+    ) -> None:
+        orch = config.get("orchestrator", {})
+        base = orch.get("prooflayer_url", "http://localhost:8000")
         self.base_url = base.rstrip("/") + "/api/v1"
         self.timeout  = 8
 
-    # ── Low-level helpers ─────────────────────────────────────────────────
+        # local_mode: constructor kwarg wins, then config, then False
+        if local_mode is None:
+            local_mode = bool(orch.get("local_mode", False))
+        self.local_mode = local_mode
+
+        # In-memory store (only populated when local_mode=True)
+        self._local_agents:    dict[str, dict] = {}
+        self._local_decisions: list[dict]      = []
+        self._local_exceptions: list[dict]     = []
+        self._local_edges:     list[dict]      = []
+
+    # ── Low-level HTTP helpers ────────────────────────────────────────────
 
     def _post(self, path: str, payload: dict) -> dict:
+        if self.local_mode:
+            return self._local_post(path, payload)
         url  = f"{self.base_url}{path}"
         body = json.dumps(payload).encode()
         req  = urllib.request.Request(
@@ -46,6 +85,8 @@ class ProofLayerGateway:
             raise RuntimeError(f"ProofLayer {path} HTTP {exc.code}: {raw}") from exc
 
     def _get(self, path: str, params: dict | None = None) -> dict | list:
+        if self.local_mode:
+            return self._local_get(path, params)
         qs  = ""
         if params:
             qs = "?" + "&".join(f"{k}={v}" for k, v in params.items() if v is not None)
@@ -57,6 +98,111 @@ class ProofLayerGateway:
         except urllib.error.HTTPError as exc:
             raw = exc.read().decode(errors="replace")
             raise RuntimeError(f"ProofLayer {path} HTTP {exc.code}: {raw}") from exc
+
+    # ── Local-mode in-memory store ────────────────────────────────────────
+
+    def _now(self) -> str:
+        return datetime.now(UTC).isoformat()
+
+    def _uid(self) -> str:
+        return str(uuid.uuid4())
+
+    def _local_post(self, path: str, payload: dict) -> dict:
+        if path == "/agents":
+            record = {
+                **payload,
+                "agent_id":       self._uid(),
+                "agent_version":  payload.get("agent_version", "1.0"),
+                "registered_at":  self._now(),
+                "last_seen":      self._now(),
+            }
+            self._local_agents[payload.get("agent_name", self._uid())] = record
+            return record
+
+        if path == "/decisions":
+            decision_id = self._uid()
+            record = {
+                **payload,
+                "decision_id":  decision_id,
+                "snapshot_id":  self._uid(),
+                "policy_edges": 0,
+                "trace_steps":  len(payload.get("trace_steps", [])),
+                "timestamp":    self._now(),
+            }
+            self._local_decisions.append(record)
+            return record
+
+        if path == "/trace-steps":
+            return {"step_id": self._uid(), "created": True}
+
+        if path == "/exceptions":
+            record = {
+                **payload,
+                "exception_id": self._uid(),
+                "exc_node_id":  self._uid(),
+                "created_at":   self._now(),
+            }
+            self._local_exceptions.append(record)
+            return record
+
+        if path == "/cross-agent-edge":
+            record = {**payload, "edge_id": self._uid(), "created_at": self._now()}
+            self._local_edges.append(record)
+            return record
+
+        return {"status": "ok", "path": path}
+
+    def _local_get(self, path: str, params: dict | None = None) -> dict | list:
+        p = params or {}
+
+        if path == "/overview":
+            confs = [float(d["confidence"]) for d in self._local_decisions
+                     if "confidence" in d]
+            pii_count = sum(1 for d in self._local_decisions if d.get("contains_pii"))
+            groups    = {d.get("agent_group") for d in self._local_decisions
+                         if d.get("agent_group")}
+            trace_count = sum(
+                int(d.get("trace_steps", 0)) for d in self._local_decisions
+            )
+            return {
+                "total_decisions":    len(self._local_decisions),
+                "human_overrides":    0,
+                "escalations":        0,
+                "avg_confidence":     round(sum(confs) / len(confs), 3) if confs else 0.0,
+                "exception_count":    len(self._local_exceptions),
+                "trace_step_count":   trace_count,
+                "pii_decision_count": pii_count,
+                "agent_group_count":  len(groups),
+            }
+
+        if path in ("/decisions", "/search"):
+            results = list(self._local_decisions)
+            if p.get("agent_name"):
+                results = [d for d in results if d.get("agent_name") == p["agent_name"]]
+            if p.get("agent_group"):
+                results = [d for d in results if d.get("agent_group") == p["agent_group"]]
+            limit = int(p.get("limit", 50))
+            return results[-limit:]
+
+        if path == "/agents":
+            return list(self._local_agents.values())
+
+        if path == "/exceptions":
+            return list(self._local_exceptions)
+
+        if path == "/cross-agent-queries":
+            return list(self._local_edges)
+
+        return []
+
+    def local_store(self) -> dict[str, Any]:
+        """Return a snapshot of the in-memory store (local_mode only)."""
+        return {
+            "agents":     list(self._local_agents.values()),
+            "decisions":  list(self._local_decisions),
+            "exceptions": list(self._local_exceptions),
+            "edges":      list(self._local_edges),
+        }
 
     # ── Agent registration ────────────────────────────────────────────────
 
