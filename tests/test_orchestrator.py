@@ -25,7 +25,6 @@ from orchestrator.memory_bridge import MemoryBridge
 from orchestrator.prooflayer_gateway import ProofLayerGateway
 from orchestrator.router import RouterAgent
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Shared fixtures
 # ═══════════════════════════════════════════════════════════════════════
