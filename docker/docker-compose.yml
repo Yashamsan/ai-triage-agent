@@ -86,7 +86,12 @@ services:
 
   triage-db:
     image: "docker.io/pgvector/pgvector:pg17"
-    ports: ["127.0.0.1:5432:5432"]
+    # Host port moved off 5432 — a different, unrelated project's Postgres
+    # (foodmind-pg) already holds 5432 on this machine. Container-to-container
+    # traffic (triage-agent -> triage-db:5432) is on the internal Docker
+    # network and is unaffected by this; only host-side tools (psql, local
+    # scripts) need to use 5433 now — see .env's DATABASE_URL.
+    ports: ["127.0.0.1:5433:5432"]
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

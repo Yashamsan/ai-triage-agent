@@ -7,10 +7,21 @@ load_dotenv()
 
 import json
 import os
+import re
 
 import litellm
 from langfuse import get_client, observe
 from pydantic import BaseModel
+
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+
+
+def _strip_json_fence(raw: str) -> str:
+    """Some models wrap JSON responses in a markdown code fence despite
+    being told to return raw JSON. Strip it before parsing."""
+    raw = raw.strip()
+    match = _JSON_FENCE_RE.match(raw)
+    return match.group(1) if match else raw
 
 SYSTEM_PROMPT = """You are a customer support triage agent. Classify the customer message into exactly one intent.
 
@@ -24,19 +35,23 @@ IMPORTANT — Security Boundary:
 Intents:
 - greeting: hi, hello, hey, good morning, how are you, or any conversational opener with no support request
 - password_reset: login issues, forgotten password, account locked, can't sign in, credentials
-- billing: payments, charges, invoices, refunds, subscriptions, pricing, double-charged
+- billing: an actual payment/charge/invoice/refund on the customer's account — a specific transaction went wrong, not a question about what a plan costs or how billing/disconnection works in general
 - technical_support: bugs, errors, crashes, features not working, slow performance
+- product_inquiry: any informational question about products, plans, packages, pricing/rates, features, specs, how something works, policies (e.g. fair usage, disconnection process), or how to reach/find the company (contact numbers, service centers, store/office locations) — if the customer is asking "what/how/where" rather than reporting something wrong with their own account, it's this
 - escalation: wants manager or supervisor, filing a formal complaint, expressing strong anger
 - unknown: does not fit any category above
 
 Return ONLY valid JSON with these exact fields:
 {
-  "intent": "<one of the six intents above>",
+  "intent": "<one of the seven intents above>",
   "confidence": <float between 0.0 and 1.0>,
   "needs_escalation": <true if message is urgent or emotionally charged, otherwise false>
 }"""
 
-VALID_INTENTS = {"greeting", "password_reset", "billing", "technical_support", "escalation", "unknown"}
+VALID_INTENTS = {
+    "greeting", "password_reset", "billing", "technical_support",
+    "product_inquiry", "escalation", "unknown",
+}
 
 
 class ClassifierOutput(BaseModel):
@@ -96,10 +111,10 @@ def classify(message: str) -> ClassifierOutput:
         pass
 
     try:
-        data = json.loads(raw)
+        data = json.loads(_strip_json_fence(raw))
         result = ClassifierOutput(**data)
     except Exception as exc:
-        print(f"[Classifier] Parse error: {exc}")
+        print(f"[Classifier] Parse error: {exc} | raw={raw[:200]!r}")
         return ClassifierOutput(intent="unknown", confidence=0.0, needs_escalation=False)
 
     if result.intent not in VALID_INTENTS:

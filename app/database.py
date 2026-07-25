@@ -5,6 +5,7 @@ All functions use a short-lived connection per call (no pool needed at
 this scale; swap in psycopg2.pool or asyncpg when load demands it).
 """
 
+import json
 import os
 from contextlib import contextmanager
 from pathlib import Path
@@ -94,6 +95,65 @@ def find_faq(intent: str, embedding: list[float]) -> dict | None:
             return cur.fetchone()
 
 
+# ── Knowledge base (product_inquiry) ─────────────────────────────────
+
+def find_kb_chunk(embedding: list[float], lang: str = "en", min_similarity: float = 0.35) -> dict | None:
+    """Return the closest knowledge-base chunk in the given language, or None
+    if nothing clears min_similarity (unlike FAQ lookup, this isn't filtered
+    by intent, so a weak match is more likely and shouldn't be presented as
+    an answer).
+
+    0.35, not 0.5: measured against this real KB, genuine correct matches
+    for plainly-phrased questions ("what mobile packages do you offer")
+    scored as low as 0.47, while irrelevant queries ("tell me a joke") top
+    out around 0.10-0.15 — there's a wide, safe gap between them."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT title, content, source_file, row_ref,
+                       1 - (embedding <=> %s::vector) AS similarity
+                FROM   knowledge_base_chunks
+                WHERE  lang = %s
+                ORDER  BY embedding <=> %s::vector
+                LIMIT  1
+                """,
+                (str(embedding), lang, str(embedding)),
+            )
+            row = cur.fetchone()
+            if row and row["similarity"] >= min_similarity:
+                return row
+            return None
+
+
+def delete_kb_chunks_for_file(source_file: str) -> int:
+    """Delete all chunks previously ingested from source_file, so re-running
+    the ingestion script on an updated spreadsheet doesn't pile up duplicates."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM knowledge_base_chunks WHERE source_file = %s", (source_file,))
+            deleted = cur.rowcount
+        conn.commit()
+    return deleted
+
+
+def insert_kb_chunk(
+    source_file: str, row_ref: str, title: str, content: str,
+    embedding: list[float], lang: str = "en", metadata: dict | None = None,
+) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO knowledge_base_chunks
+                    (source_file, row_ref, title, content, lang, metadata, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::vector)
+                """,
+                (source_file, row_ref, title, content, lang, json.dumps(metadata or {}), str(embedding)),
+            )
+        conn.commit()
+
+
 def insert_faq(intent: str, title: str, content: str, embedding: list[float]) -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -124,23 +184,6 @@ def create_ticket(user_message: str, intent: str, embedding: list[float]) -> int
             ticket_id = cur.fetchone()[0]
         conn.commit()
     return ticket_id
-
-
-def find_similar_tickets(embedding: list[float], limit: int = 3) -> list[dict]:
-    """Return the most similar open tickets by vector distance."""
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT id, user_message, intent, status,
-                       1 - (embedding <=> %s::vector) AS similarity
-                FROM   support_tickets
-                ORDER  BY embedding <=> %s::vector
-                LIMIT  %s
-                """,
-                (str(embedding), str(embedding), limit),
-            )
-            return cur.fetchall()
 
 
 # ── Conversation history ──────────────────────────────────────────────

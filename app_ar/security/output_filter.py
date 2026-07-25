@@ -47,7 +47,7 @@ class OutputFilter:
 
     VALID_INTENTS: frozenset[str] = frozenset({
         "greeting", "password_reset", "billing", "technical_support",
-        "escalation", "unknown",
+        "product_inquiry", "escalation", "unknown",
     })
 
     def __init__(self, allowed_domains: set[str] | None = None):

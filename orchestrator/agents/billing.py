@@ -169,7 +169,8 @@ class BillingAgent(BaseSpecialistAgent):
                     f"Refund of {amt_str} requires Finance approval (ref REF-{ref}). "
                     f"Finance team will review within 2 business days and contact you."
                 )
-                notes.append(f"Finance workflow triggered — amount SAR {amount:.2f} exceeds manager threshold.")
+                amt_note = f"SAR {amount:.2f}" if amount else "unspecified amount"
+                notes.append(f"Finance workflow triggered — {amt_note} exceeds manager threshold.")
 
         elif intent == "billing_error":
             text = (

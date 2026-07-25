@@ -27,16 +27,24 @@ Respond ONLY in JSON format:
 {
     "needs_revision": true/false,
     "issues": ["issue 1"],
-    "suggested_intent": "password_reset" | "billing" | "technical_support" | "escalation" | null,
+    "suggested_intent": "password_reset" | "billing" | "technical_support" | "product_inquiry" | "escalation" | null,
     "suggested_routing": "responder" | "escalation",
     "confidence_adjustment": -0.1,
     "critique": "Brief 1-2 sentence explanation"
 }
 
+"product_inquiry" is a valid intent (informational questions about products,
+plans, pricing, policies, or how to reach/find the company) — it is NOT a
+missing category, do not flag it as needing revision just because it isn't
+one of the other four.
+
 Set needs_revision=false if the classification is accurate and appropriate.
 """
 
-VALID_INTENTS = {"greeting", "password_reset", "billing", "technical_support", "escalation", "unknown"}
+VALID_INTENTS = {
+    "greeting", "password_reset", "billing", "technical_support",
+    "product_inquiry", "escalation", "unknown",
+}
 
 
 def _resolve_model() -> tuple[str, dict]:

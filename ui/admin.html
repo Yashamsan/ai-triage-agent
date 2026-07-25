@@ -730,6 +730,7 @@
           <button class="tab-btn" data-tab="trace">🧠 Trace</button>
           <button class="tab-btn" data-tab="exceptions">💬 Exceptions</button>
           <button class="tab-btn" data-tab="governance">🔗 Governance</button>
+          <button class="tab-btn" data-tab="sdaia">🇸🇦 SDAIA</button>
         </div>
       </div>
 
@@ -956,6 +957,33 @@
         </div>
       </div>
 
+      <!-- SDAIA Compliance -->
+      <div class="tab-panel" id="tab-sdaia">
+        <div id="sdaia-loading" class="loading">Loading SDAIA dashboard…</div>
+        <div id="sdaia-content" style="display:none">
+          <div class="gov-kpi-row" id="sdaia-kpis"></div>
+          <div class="card">
+            <div class="card-title">⚠️ Incidents</div>
+            <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:11px;color:var(--muted)">Open only:</label>
+              <input type="checkbox" id="sdaia-open-filter" onchange="loadSdaiaDashboard()" />
+              <button class="btn secondary" onclick="loadSdaiaDashboard()">↻ Refresh</button>
+            </div>
+            <table class="gov-table" id="sdaia-incidents-table">
+              <thead><tr><th>Severity</th><th>Status</th><th>Description</th><th>Agent</th><th>Reported</th><th>Detected</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card" id="sdaia-agents-card">
+            <div class="card-title">🤖 Agents by SDAIA Risk</div>
+            <table class="gov-table" id="sdaia-agents-table">
+              <thead><tr><th>Agent</th><th>Sector</th><th>Risk</th><th>Ethics Label</th><th>Open Incidents</th><th>Safety Reports</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /detail-content -->
   </div><!-- /detail-panel -->
 </main>
@@ -965,6 +993,7 @@ const API = '';
 let currentId = null;
 let searchTimeout = null;
 let complianceLoaded = false;
+let sdaiaLoaded = false;
 let agentsLoaded = false;
 
 // ── Agent catalog ──────────────────────────────────────────────────────────
@@ -1567,6 +1596,95 @@ function renderGovernance(data) {
   }
 }
 
+// ── SDAIA Compliance ────────────────────────────────────────────────────────
+
+const SDAIA_LEVEL_COLOR = {
+  CRITICAL: 'var(--red)', HIGH: 'var(--yellow)',
+  MEDIUM: 'var(--accent)', LOW: 'var(--green)',
+};
+
+function sdaiaEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+async function loadSdaiaDashboard() {
+  document.getElementById('sdaia-loading').style.display = '';
+  document.getElementById('sdaia-loading').textContent = 'Loading SDAIA dashboard…';
+  document.getElementById('sdaia-loading').style.color = '';
+  document.getElementById('sdaia-content').style.display = 'none';
+
+  const openOnly = document.getElementById('sdaia-open-filter')?.checked ? 'true' : '';
+  const params = new URLSearchParams({ limit: '20' });
+  if (openOnly) params.set('open_only', 'true');
+
+  try {
+    const [overview, agents, incidents] = await Promise.all([
+      apiFetch('/api/v1/sdaia/overview'),
+      apiFetch('/api/v1/sdaia/agents'),
+      apiFetch(`/api/v1/sdaia/incidents?${params}`),
+    ]);
+    renderSdaia(overview, agents, incidents);
+    sdaiaLoaded = true;
+  } catch (e) {
+    document.getElementById('sdaia-loading').textContent = `Error: ${e.message}`;
+    document.getElementById('sdaia-loading').style.color = 'var(--red)';
+  }
+}
+
+function renderSdaia(overview, agents, incidents) {
+  document.getElementById('sdaia-loading').style.display = 'none';
+  document.getElementById('sdaia-content').style.display = '';
+
+  document.getElementById('sdaia-kpis').innerHTML = [
+    { val: overview.agents_classified, lbl: 'Agents Classified', color: 'var(--accent)' },
+    { val: overview.open_incidents, lbl: 'Open Incidents', color: overview.open_incidents > 0 ? 'var(--red)' : 'var(--green)' },
+    { val: overview.critical_incidents, lbl: 'Critical (Open)', color: 'var(--red)' },
+    { val: overview.total_incidents, lbl: 'Total Incidents', color: 'var(--text)' },
+    { val: overview.total_safety_reports, lbl: 'Safety Reports', color: 'var(--green)' },
+    { val: overview.ethics_labels_assigned, lbl: 'Ethics Labels', color: 'var(--purple)' },
+    { val: overview.reported_to_regulator, lbl: 'Reported to Regulator', color: 'var(--yellow)' },
+  ].map(k => `
+    <div class="gov-kpi">
+      <div class="gkv" style="color:${k.color}">${k.val}</div>
+      <div class="gkl">${k.lbl}</div>
+    </div>
+  `).join('');
+
+  const incBody = document.querySelector('#sdaia-incidents-table tbody');
+  if (!incidents.length) {
+    incBody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:16px">No incidents recorded.</td></tr>';
+  } else {
+    incBody.innerHTML = incidents.map(i => `
+      <tr>
+        <td style="color:${SDAIA_LEVEL_COLOR[i.severity] || 'var(--text)'}">${sdaiaEsc(i.severity)}</td>
+        <td>${i.resolved_at ? '<span style="color:var(--green)">Resolved</span>' : '<span style="color:var(--red)">Open</span>'}</td>
+        <td>${sdaiaEsc((i.description || '').slice(0, 80))}${(i.description || '').length > 80 ? '…' : ''}</td>
+        <td style="color:var(--purple)">${sdaiaEsc(i.agent_name || i.agent_id)}</td>
+        <td>${i.reported_to_regulator ? '🚀 ' + sdaiaEsc(i.regulator_report_ref || '') : '—'}</td>
+        <td style="color:var(--muted)">${fmtTime(i.detected_at)}</td>
+      </tr>
+    `).join('');
+  }
+
+  const agBody = document.querySelector('#sdaia-agents-table tbody');
+  if (!agents.length) {
+    agBody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:16px">No agents registered yet.</td></tr>';
+  } else {
+    agBody.innerHTML = agents.map(a => `
+      <tr>
+        <td style="color:var(--purple)">${sdaiaEsc(a.name)}</td>
+        <td>${sdaiaEsc(a.sector)}</td>
+        <td style="color:${SDAIA_LEVEL_COLOR[a.risk_level] || 'var(--muted)'}">${sdaiaEsc(a.risk_level || 'not assessed')}</td>
+        <td>${a.ethics_label_en ? `${sdaiaEsc(a.ethics_label_ar)} (${sdaiaEsc(a.ethics_label_en)})` : '—'}</td>
+        <td style="color:${a.open_incidents > 0 ? 'var(--red)' : 'var(--muted)'}">${a.open_incidents}</td>
+        <td>${a.safety_report_count}</td>
+      </tr>
+    `).join('');
+  }
+}
+
 // ── v3 KPIs (Overview) ─────────────────────────────────────────────────────
 
 async function loadV3KPIs() {
@@ -1798,6 +1916,7 @@ function switchTab(name) {
   if (name === 'trace')       loadTrace();
   if (name === 'exceptions')  loadExceptions();
   if (name === 'governance')  loadGovernance();
+  if (name === 'sdaia' && !sdaiaLoaded) loadSdaiaDashboard();
 }
 
 // Open compliance tab from badge

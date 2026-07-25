@@ -50,6 +50,35 @@ def find_faq(intent: str, embedding: list[float]) -> dict | None:
             return cur.fetchone()
 
 
+def find_kb_chunk(embedding: list[float], lang: str = "ar", min_similarity: float = 0.35) -> dict | None:
+    """Return the closest knowledge-base chunk in the given language, or None
+    if nothing clears min_similarity (not filtered by intent, so a weak
+    match is more likely).
+
+    Threshold is lower than the English default (0.5) because all-MiniLM-L6-v2
+    isn't a true multilingual model (see app_ar/embeddings.py) — measured
+    against this KB, a genuine Arabic match scores ~0.42-0.43 where the
+    equivalent English match scores ~0.61. 0.5 would silently reject nearly
+    every real Arabic hit."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT title, content, source_file, row_ref,
+                       1 - (embedding <=> %s::vector) AS similarity
+                FROM   knowledge_base_chunks
+                WHERE  lang = %s
+                ORDER  BY embedding <=> %s::vector
+                LIMIT  1
+                """,
+                (str(embedding), lang, str(embedding)),
+            )
+            row = cur.fetchone()
+            if row and row["similarity"] >= min_similarity:
+                return row
+            return None
+
+
 def insert_faq(intent: str, title: str, content: str, embedding: list[float]) -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -77,22 +106,6 @@ def create_ticket(user_message: str, intent: str, embedding: list[float]) -> int
             ticket_id = cur.fetchone()[0]
         conn.commit()
     return ticket_id
-
-
-def find_similar_tickets(embedding: list[float], limit: int = 3) -> list[dict]:
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT id, user_message, intent, status,
-                       1 - (embedding <=> %s::vector) AS similarity
-                FROM   support_tickets
-                ORDER  BY embedding <=> %s::vector
-                LIMIT  %s
-                """,
-                (str(embedding), str(embedding), limit),
-            )
-            return cur.fetchall()
 
 
 def save_message(session_id: str, role: str, message: str, intent: str | None = None) -> None:

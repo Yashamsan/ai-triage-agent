@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import threading
 import uuid
 from pathlib import Path
 
@@ -15,8 +16,10 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.agent_graph import triage_agent
+from app.multi_agent_routes import router as multi_agent_router
 from app.prooflayer_api import router as prooflayer_router
 from app.prooflayer_graph import record_decision
+from app.sdaia_api import router as sdaia_router
 from app.security.guard_classifier import guard_classify
 from app.security.input_sanitizer import InputSanitizer
 from app.security.output_filter import OutputFilter
@@ -28,6 +31,18 @@ from audit import audit_record
 
 app = FastAPI(title="AI Triage Agent")
 app.include_router(prooflayer_router)
+app.include_router(multi_agent_router)
+app.include_router(sdaia_router)
+
+try:
+    # Additive, demo-scoped durable-execution path (POST /triage/durable) —
+    # requires temporalio + a running Temporal server. Never let its absence
+    # take down the core app (password_reset/billing/technical_support/etc.
+    # via the existing /triage endpoint above must keep working regardless).
+    from app.temporal_routes import router as temporal_router
+    app.include_router(temporal_router)
+except Exception as exc:
+    print(f"[startup] /triage/durable (Temporal) route skipped: {exc}")
 
 
 @app.on_event("startup")
@@ -48,6 +63,18 @@ def _startup() -> None:
         print("[startup] embedding model pre-warmed")
     except Exception as exc:
         print(f"[startup] embedding warmup skipped: {exc}")
+    # Orchestrator registration calls ProofLayer over HTTP (localhost:8000),
+    # i.e. this same app — which isn't accepting connections yet during its
+    # own startup event. Defer a few seconds so uvicorn has bound the port.
+    def _delayed_orchestrator_init() -> None:
+        try:
+            from app.multi_agent_routes import init_orchestrator
+            init_orchestrator()
+            print("[startup] multi-agent orchestrator pre-warmed")
+        except Exception as exc:
+            print(f"[startup] orchestrator eager init skipped: {exc}")
+
+    threading.Timer(3.0, _delayed_orchestrator_init).start()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -70,6 +97,24 @@ _ARABIC_RANGES = (
 
 def _is_arabic(text: str) -> bool:
     return any(lo <= ord(c) <= hi for c in text for lo, hi in _ARABIC_RANGES)
+
+
+# Sticky per-session language routing. _is_arabic() only looks at the
+# current message's characters, so a numeric/English follow-up (e.g. "4569"
+# in reply to "give me the last 4 digits of your card") inside an Arabic
+# conversation would otherwise get routed to _triage_en — a different
+# LangGraph instance with a different thread_id, losing all prior context.
+# Remember which language a session started in and keep routing there.
+_session_language: dict[str, str] = {}
+
+
+def _resolve_language(session_id: str | None, message: str) -> str:
+    if session_id and session_id in _session_language:
+        return _session_language[session_id]
+    language = "ar" if _is_arabic(message) else "en"
+    if session_id:
+        _session_language[session_id] = language
+    return language
 
 
 class TriageRequest(BaseModel):
@@ -100,7 +145,7 @@ async def triage(request: TriageRequest, background_tasks: BackgroundTasks):
     if not request.message.strip():
         raise HTTPException(status_code=422, detail="message cannot be empty")
 
-    if _is_arabic(request.message):
+    if _resolve_language(request.session_id, request.message) == "ar":
         result = await _triage_ar(request)
         agent_name = "triage-agent-ar"
     else:

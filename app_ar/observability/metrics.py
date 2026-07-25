@@ -56,6 +56,13 @@ def trace_vector_search(intent: str, embedding: list[float]) -> dict[str, Any] |
     return find_faq(intent, embedding)
 
 
+@observe(name="trace-kb-search-ar")
+def trace_kb_search(embedding: list[float]) -> dict[str, Any] | None:
+    from app_ar.database import find_kb_chunk
+
+    return find_kb_chunk(embedding)
+
+
 @observe(name="trace-ticket-creation-ar")
 def trace_ticket_creation(user_message: str, intent: str, embedding: list[float]) -> int:
     from app_ar.database import create_ticket

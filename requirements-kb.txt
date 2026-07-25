@@ -1,0 +1,12 @@
+# Dependencies for scripts/ingest_knowledge_base.py ONLY.
+#
+# Deliberately kept out of requirements.txt (which drives the production
+# Docker image via Dockerfile) — the running API never needs pandas/openpyxl,
+# only this offline ingestion script does. Install locally when you need to
+# (re)ingest the knowledge base:
+#
+#   pip install -r requirements-kb.txt
+#   python scripts/ingest_knowledge_base.py
+
+pandas>=2.0.0
+openpyxl>=3.1.0

@@ -1,0 +1,6 @@
+# Minimal Temporal dynamic config for local demo use.
+# Temporal Server runs fine with this empty/near-empty — only add overrides
+# here if you hit specific limits (e.g. frontend rate limiting) during the demo.
+frontend.enableClientVersionCheck:
+  - value: true
+    constraints: {}

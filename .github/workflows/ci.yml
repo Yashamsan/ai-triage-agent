@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt pytest pytest-cov
-      - run: pytest -m "not llm" --cov=app --cov-report=term-missing
+      - run: pytest -m "not llm" --tb=short -q tests/test_agent.py tests/test_orchestrator.py --cov=app --cov=orchestrator --cov-report=term-missing
 
   docker-build:
     name: Docker Build

@@ -72,7 +72,8 @@ def main() -> None:
 
     # ── Bootstrap ──────────────────────────────────────────────────────────
     cfg     = load_config()
-    gateway = ProofLayerGateway(cfg)
+    # Use local_mode when Docker / ProofLayer API is not running
+    gateway = ProofLayerGateway(cfg, local_mode=True)
     memory  = MemoryBridge()
     router  = RouterAgent(cfg, gateway=gateway, memory=memory)
 

@@ -15,7 +15,10 @@ load_dotenv()
 
 from litellm import completion
 
-VALID_INTENTS = {"greeting", "password_reset", "billing", "technical_support", "escalation", "unknown"}
+VALID_INTENTS = {
+    "greeting", "password_reset", "billing", "technical_support",
+    "product_inquiry", "escalation", "unknown",
+}
 
 # English prompt used deliberately — DeepSeek produces reliable JSON with English
 # system prompts even when the user query is in Arabic. The intent labels are
@@ -33,17 +36,22 @@ You evaluate:
 2. **Escalation need** — Does this query need a human agent even if classified correctly?
 3. **Policy compliance** — Does the handling align with standard support protocols?
 
-Valid intents: password_reset | billing | technical_support | escalation | unknown
+Valid intents: password_reset | billing | technical_support | product_inquiry | escalation | unknown
 
 Respond ONLY in JSON format:
 {
     "needs_revision": true/false,
     "issues": ["issue 1"],
-    "suggested_intent": "password_reset" | "billing" | "technical_support" | "escalation" | null,
+    "suggested_intent": "password_reset" | "billing" | "technical_support" | "product_inquiry" | "escalation" | null,
     "suggested_routing": "responder" | "escalation",
     "confidence_adjustment": -0.1,
     "critique": "Brief 1-2 sentence explanation in Arabic (the customer's language)"
 }
+
+"product_inquiry" is a valid intent (informational questions about products,
+plans, pricing, policies, or how to reach/find the company) — it is NOT a
+missing category, do not flag it as needing revision just because it isn't
+one of the other four.
 
 Set needs_revision=false if the classification is accurate and appropriate.
 """

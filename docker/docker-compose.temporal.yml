@@ -1,0 +1,60 @@
+# Temporal Server — local demo stack for durable workflow execution.
+#
+# Separate from docker-compose.yml (the LangFuse + triage-agent stack) so it
+# can be started/stopped independently. Its Postgres runs on host port 5434,
+# NOT 5432 or 5433 — those are already taken on this machine (5432 by an
+# unrelated project's Postgres, 5433 by our own triage-db).
+#
+# Usage:
+#   cd docker
+#   docker compose -f docker-compose.temporal.yml up -d
+#   open http://localhost:8233   (Web UI)
+
+services:
+  temporal-postgresql:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    depends_on:
+      temporal-postgresql:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/temporal-dynamic.yaml
+    ports:
+      - "127.0.0.1:7233:7233"
+    volumes:
+      - ./temporal-dynamic.yaml:/etc/temporal/config/dynamicconfig/temporal-dynamic.yaml:ro
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "127.0.0.1:8233:8080"
+    restart: unless-stopped
+
+volumes:
+  temporal_postgres_data:

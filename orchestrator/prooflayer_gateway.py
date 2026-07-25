@@ -257,7 +257,7 @@ class ProofLayerGateway:
             "agent_name":       agent_name,
             "agent_group":      agent_group,
             "model_id":         model_id,
-            "decision":         decision_value,
+            "decision_value":   decision_value,
             "confidence":       confidence,
             "session_id":       session_id,
             "contains_pii":     contains_pii,
@@ -275,7 +275,7 @@ class ProofLayerGateway:
             for step in trace_steps:
                 try:
                     self._post("/trace-steps", {
-                        "decision_node_id": decision_id,
+                        "decision_id":      decision_id,
                         "node_type":        step.get("node_type", "unknown"),
                         "thought":          step.get("thought", ""),
                         "action":           step.get("action", ""),
@@ -310,14 +310,14 @@ class ProofLayerGateway:
             metadata["reflection_notes"] = reflection_notes
 
         result = self._post("/decisions", {
-            "agent_name":   "orchestrator-router",
-            "agent_group":  "orchestrator",
-            "model_id":     "router-v1",
-            "decision":     decision_value,
-            "confidence":   confidence,
-            "session_id":   session_id,
-            "contains_pii": contains_pii,
-            "metadata":     metadata,
+            "agent_name":     "orchestrator-router",
+            "agent_group":    "orchestrator",
+            "model_id":       "router-v1",
+            "decision_value": decision_value,
+            "confidence":     confidence,
+            "session_id":     session_id,
+            "contains_pii":   contains_pii,
+            "metadata":       metadata,
         })
 
         # Link router decision → agent decision as a cross-agent edge
@@ -345,10 +345,10 @@ class ProofLayerGateway:
     ) -> dict:
         """Record a human override or policy exception on a decision."""
         return self._post("/exceptions", {
-            "decision_id": decision_id,
-            "reason":      reason,
-            "severity":    severity,
-            "raised_by":   raised_by,
+            "decision_id":     decision_id,
+            "human_narrative": reason,
+            "severity":        severity,
+            "approver":        raised_by,
         })
 
     # ── Cross-agent edge ──────────────────────────────────────────────────

@@ -405,16 +405,27 @@ def create_exception(req: ExceptionRequest):
 
 @router.get("/exceptions")
 def list_exceptions(
+    decision_id: str | None = Query(None, description="Scope to a single decision's exceptions"),
     since_days: int = Query(30, ge=1, le=365),
     severity: str | None = Query(None),
     limit: int = Query(50, ge=1, le=500),
 ):
-    """List all recorded exceptions with optional severity filter."""
+    """List recorded exceptions.
+
+    Pass decision_id to scope to one decision (returns all of that
+    decision's exceptions regardless of age); otherwise returns the global
+    feed within the trailing since_days window.
+    """
     conn = _get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    clauses = ["e.created_at >= NOW() - INTERVAL '1 day' * %(since_days)s"]
-    params: dict[str, Any] = {"since_days": since_days, "limit": limit}
+    params: dict[str, Any] = {"limit": limit}
+    if decision_id:
+        clauses = ["e.decision_node_id = %(decision_id)s"]
+        params["decision_id"] = decision_id
+    else:
+        clauses = ["e.created_at >= NOW() - INTERVAL '1 day' * %(since_days)s"]
+        params["since_days"] = since_days
     if severity:
         clauses.append("severity = %(severity)s")
         params["severity"] = severity

@@ -1,6 +1,7 @@
 from app_ar.observability.metrics import (
     RetrievalMetricsLogger,
     trace_embedding,
+    trace_kb_search,
     trace_ticket_creation,
     trace_vector_search,
 )
@@ -10,4 +11,5 @@ __all__ = [
     "trace_embedding",
     "trace_ticket_creation",
     "trace_vector_search",
+    "trace_kb_search",
 ]

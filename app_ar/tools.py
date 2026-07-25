@@ -9,6 +9,7 @@ from langfuse import observe
 from app_ar.observability import (
     RetrievalMetricsLogger,
     trace_embedding,
+    trace_kb_search,
     trace_ticket_creation,
     trace_vector_search,
 )
@@ -70,6 +71,36 @@ def faq_lookup(intent: str, user_message: str) -> ToolResult:
     return ToolResult(success=False, data="لم يتم العثور على مقالة مناسبة.", resolved=False)
 
 
+@observe(name="kb_lookup_ar")
+def kb_lookup(user_message: str) -> ToolResult:
+    """Answer a product question from the private company knowledge base
+    (see scripts/ingest_knowledge_base.py)."""
+    metrics = RetrievalMetricsLogger()
+    try:
+        with metrics.trace_latency("embedding"):
+            embedding = trace_embedding(user_message)
+        with metrics.trace_latency("kb_search"):
+            row = trace_kb_search(embedding)
+
+        hit = row is not None
+        metrics.score_hit(hit)
+        metrics.score_mrr(1 if hit else None)
+
+        if hit:
+            return ToolResult(success=True, data=row["content"], resolved=True)
+    except Exception:
+        pass
+
+    return ToolResult(
+        success=False,
+        data=(
+            "لم أجد معلومات حول ذلك في وثائق المنتج لدينا. "
+            "سأقوم بإنشاء تذكرة ليتابع معك أحد المختصين مباشرة."
+        ),
+        resolved=False,
+    )
+
+
 @observe(name="ticket_lookup_ar")
 def ticket_lookup(user_message: str) -> ToolResult:
     """Create a support ticket with Arabic confirmation."""
@@ -107,13 +138,15 @@ def run_tool(intent: str, user_message: str) -> ToolResult:
                 "يمكنني المساعدة في:\n\n"
                 "• **كلمة المرور وحساب الدخول** — إعادة تعيين، حسابات مقفلة\n"
                 "• **الفواتير والمدفوعات** — الفواتير، الرسوم، استرداد المبالغ\n"
-                "• **المشاكل التقنية** — أخطاء التطبيق، مشاكل API"
+                "• **المشاكل التقنية** — أخطاء التطبيق، مشاكل API\n"
+                "• **أسئلة عن المنتج** — الميزات، المواصفات، كيفية الاستخدام"
             ),
             resolved=True,
         ),
         "password_reset": faq_lookup,
         "billing": faq_lookup,
         "technical_support": faq_lookup,
+        "product_inquiry": lambda i, m: kb_lookup(m),
         "escalation": lambda i, m: ticket_lookup(m),
         "unknown": lambda i, m: ToolResult(
             success=False,
@@ -121,7 +154,8 @@ def run_tool(intent: str, user_message: str) -> ToolResult:
                 "لم أفهم استفسارك تماماً. يمكنني المساعدة في:\n\n"
                 "• **كلمة المرور وحساب الدخول** — إعادة تعيين، حسابات مقفلة\n"
                 "• **الفواتير والمدفوعات** — الفواتير، الرسوم، استرداد المبالغ\n"
-                "• **المشاكل التقنية** — أخطاء التطبيق، مشاكل API\n\n"
+                "• **المشاكل التقنية** — أخطاء التطبيق، مشاكل API\n"
+                "• **أسئلة عن المنتج** — الميزات، المواصفات، كيفية الاستخدام\n\n"
                 "هل يمكنك توضيح مشكلتك؟"
             ),
             resolved=False,

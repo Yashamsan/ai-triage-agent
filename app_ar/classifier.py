@@ -6,10 +6,21 @@ load_dotenv()
 
 import json
 import os
+import re
 
 import litellm
 from langfuse import get_client, observe
 from pydantic import BaseModel
+
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+
+
+def _strip_json_fence(raw: str) -> str:
+    """Qwen (via OpenRouter) sometimes wraps JSON responses in a markdown
+    code fence despite being told to return raw JSON. Strip it before parsing."""
+    raw = raw.strip()
+    match = _JSON_FENCE_RE.match(raw)
+    return match.group(1) if match else raw
 
 AR_SYSTEM_PROMPT = """أنت وكيل تصنيف دعم العملاء. قم بتصنيف رسالة العميل إلى intent واحد بالضبط.
 
@@ -23,21 +34,25 @@ AR_SYSTEM_PROMPT = """أنت وكيل تصنيف دعم العملاء. قم ب�
 التصنيفات:
 - greeting: مرحبا، أهلاً، السلام عليكم، صباح الخير، كيف حالك، أو أي افتتاحية محادثة بدون طلب دعم
 - password_reset: مشاكل تسجيل الدخول، كلمة المرور المفقودة، الحساب المقفل، لا يستطيع تسجيل الدخول، بيانات الدخول
-- billing: المدفوعات، الرسوم، الفواتير، استرداد الأموال، الاشتراكات، الأسعار، الدفع المزدوج
+- billing: مشكلة فعلية في دفعة أو رسوم أو فاتورة في حساب العميل — معاملة محددة حدث فيها خطأ، وليست سؤالاً عامًا عن تكلفة باقة أو كيفية عمل الفوترة أو إلغاء الاشتراك
 - technical_support: أخطاء البرامج، أعطال، الميزات لا تعمل، الأداء البطيء
+- product_inquiry: أي سؤال معلوماتي عن المنتجات أو الباقات أو الأسعار أو المواصفات أو كيف يعمل شيء ما أو السياسات (مثل الاستخدام العادل أو إجراءات فصل الخدمة)، أو كيفية التواصل مع الشركة (أرقام التواصل، مراكز الخدمة، الفروع) — إذا كان العميل يسأل "ماذا/كيف/أين" بدلاً من الإبلاغ عن مشكلة في حسابه الخاص، فهذا هو التصنيف المناسب
 - escalation: يريد مدير أو مشرف، تقديم شكوى رسمية، التعبير عن غضب شديد
 - unknown: لا يناسب أي فئة من الفئات أعلاه
 
 ارجع فقط JSON صالح بهذه الحقول بالضبط:
 {
-  "intent": "<واحدة من التصنيفات الستة أعلاه>",
+  "intent": "<واحدة من التصنيفات السبعة أعلاه>",
   "confidence": <رقم عشري بين 0.0 و 1.0>,
   "needs_escalation": <true إذا كانت الرسالة عاجلة أو مشحونة عاطفياً، وإلا false>
 }
 
-يجب أن تكون أسماء التصنيفات باللغة الإنجليزية (greeting, password_reset, billing, technical_support, escalation, unknown)."""
+يجب أن تكون أسماء التصنيفات باللغة الإنجليزية (greeting, password_reset, billing, technical_support, product_inquiry, escalation, unknown)."""
 
-VALID_INTENTS = {"greeting", "password_reset", "billing", "technical_support", "escalation", "unknown"}
+VALID_INTENTS = {
+    "greeting", "password_reset", "billing", "technical_support",
+    "product_inquiry", "escalation", "unknown",
+}
 
 
 class ClassifierOutput(BaseModel):
@@ -114,10 +129,10 @@ def classify_ar(message: str) -> ClassifierOutput:
         pass
 
     try:
-        data = json.loads(raw)
+        data = json.loads(_strip_json_fence(raw))
         result = ClassifierOutput(**data)
     except Exception as exc:
-        print(f"[Classifier AR] Parse error: {exc} | raw={raw[:200]}")
+        print(f"[Classifier AR] Parse error: {exc} | raw={raw[:200]!r}")
         return ClassifierOutput(intent="unknown", confidence=0.0, needs_escalation=False)
 
     if result.intent not in VALID_INTENTS:

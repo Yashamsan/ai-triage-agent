@@ -12,3 +12,9 @@ htmlcov/
 .pytest_cache/
 .ruff_cache/
 audit_data/
+.coverage
+
+# Private company knowledge base — proprietary source files, never committed.
+# The ingestion script (scripts/ingest_knowledge_base.py) reads from here and
+# writes only embeddings/derived text into Postgres, which also isn't in git.
+knowledge_base/raw/

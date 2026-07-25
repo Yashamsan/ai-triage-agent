@@ -33,6 +33,22 @@ CREATE TABLE IF NOT EXISTS conversation_history (
     created_at  TIMESTAMP    DEFAULT NOW()
 );
 
+-- Private company knowledge base (product_inquiry intent) — same physical
+-- table as app/schema.sql's; declared here too (IF NOT EXISTS) so either
+-- pipeline can apply its own schema.sql standalone and still get it.
+CREATE TABLE IF NOT EXISTS knowledge_base_chunks (
+    id          SERIAL PRIMARY KEY,
+    source_file TEXT         NOT NULL,
+    row_ref     TEXT,
+    title       TEXT,
+    content     TEXT         NOT NULL,
+    lang        VARCHAR(10)  DEFAULT 'en',
+    metadata    JSONB        DEFAULT '{}',
+    embedding   vector(384),
+    created_at  TIMESTAMP    DEFAULT NOW()
+);
+ALTER TABLE knowledge_base_chunks ADD COLUMN IF NOT EXISTS lang VARCHAR(10) DEFAULT 'en';
+
 -- HNSW indexes
 CREATE INDEX IF NOT EXISTS faq_embedding_hnsw
     ON faq_articles USING hnsw (embedding vector_cosine_ops);
@@ -42,3 +58,6 @@ CREATE INDEX IF NOT EXISTS ticket_embedding_hnsw
 
 CREATE INDEX IF NOT EXISTS history_session_idx
     ON conversation_history (session_id);
+
+CREATE INDEX IF NOT EXISTS kb_chunk_embedding_hnsw
+    ON knowledge_base_chunks USING hnsw (embedding vector_cosine_ops);

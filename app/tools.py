@@ -14,6 +14,7 @@ from langfuse import observe
 from app.observability import (
     RetrievalMetricsLogger,
     trace_embedding,
+    trace_kb_search,
     trace_ticket_creation,
     trace_vector_search,
 )
@@ -70,6 +71,38 @@ def faq_lookup(intent: str, user_message: str) -> ToolResult:
     return ToolResult(success=False, data="No matching FAQ article found.", resolved=False)
 
 
+@observe(name="kb_lookup")
+def kb_lookup(user_message: str) -> ToolResult:
+    """Answer a product question from the private company knowledge base
+    (see scripts/ingest_knowledge_base.py). Unlike faq_lookup, there's no
+    intent-scoped table to fall back on here — a miss means genuinely
+    escalating rather than a canned answer."""
+    metrics = RetrievalMetricsLogger()
+    try:
+        with metrics.trace_latency("embedding"):
+            embedding = trace_embedding(user_message)
+        with metrics.trace_latency("kb_search"):
+            row = trace_kb_search(embedding)
+
+        hit = row is not None
+        metrics.score_hit(hit)
+        metrics.score_mrr(1 if hit else None)
+
+        if hit:
+            return ToolResult(success=True, data=row["content"], resolved=True)
+    except Exception:
+        pass
+
+    return ToolResult(
+        success=False,
+        data=(
+            "I couldn't find anything on that in our product documentation. "
+            "I'm creating a ticket so a specialist can follow up with you directly."
+        ),
+        resolved=False,
+    )
+
+
 @observe(name="ticket_lookup")
 def ticket_lookup(user_message: str) -> ToolResult:
     """Create a support ticket and return its ID."""
@@ -107,13 +140,15 @@ def run_tool(intent: str, user_message: str) -> ToolResult:
                 "I can assist with:\n\n"
                 "• **Password & account access** — resets, locked accounts\n"
                 "• **Billing** — invoices, charges, refunds\n"
-                "• **Technical issues** — app errors, API problems"
+                "• **Technical issues** — app errors, API problems\n"
+                "• **Product questions** — features, specs, how things work"
             ),
             resolved=True,
         ),
         "password_reset": lambda i, m: faq_lookup(i, m),
         "billing": lambda i, m: faq_lookup(i, m),
         "technical_support": lambda i, m: faq_lookup(i, m),
+        "product_inquiry": lambda i, m: kb_lookup(m),
         "escalation": lambda i, m: ticket_lookup(m),
         "unknown": lambda i, m: ToolResult(
             success=False,
@@ -121,7 +156,8 @@ def run_tool(intent: str, user_message: str) -> ToolResult:
                 "I'm not sure I understood that. I can help with:\n\n"
                 "• **Password & account access** — resets, locked accounts\n"
                 "• **Billing** — invoices, charges, refunds\n"
-                "• **Technical issues** — app errors, API problems\n\n"
+                "• **Technical issues** — app errors, API problems\n"
+                "• **Product questions** — features, specs, how things work\n\n"
                 "Could you describe your issue?"
             ),
             resolved=False,

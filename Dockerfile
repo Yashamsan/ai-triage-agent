@@ -16,7 +16,14 @@ COPY --from=builder /root/.local /home/appuser/.local
 COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser app_ar/ ./app_ar/
 COPY --chown=appuser:appuser audit/ ./audit/
+COPY --chown=appuser:appuser shared/ ./shared/
+COPY --chown=appuser:appuser orchestrator/ ./orchestrator/
+COPY --chown=appuser:appuser config/ ./config/
 COPY --chown=appuser:appuser ui/ ./ui/
+# Pre-create audit_data owned by appuser so the named volume mounted here
+# (docker-compose.yml: triage_audit_data) inherits correct ownership on
+# first creation instead of defaulting to root, which appuser can't write to.
+RUN mkdir -p audit_data && chown appuser:appuser audit_data
 ENV PATH="/home/appuser/.local/bin:$PATH"
 ENV PYTHONPATH="/home/appuser/app"
 USER appuser
