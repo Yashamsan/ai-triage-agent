@@ -1,164 +1,160 @@
 # AI Triage Agent
 
-Customer support intent classification API.
-- **Week 1** — keyword-based classifier, FastAPI skeleton, GitHub push
-- **Week 2** — replaced with LLM reasoning via LiteLLM + DeepSeek, Langfuse observability
-- **Week 3** — promptfoo eval suite, LiteLLM proxy with cost tracking and model fallback
-- **Week 4** — Zero Trust security stack: input sanitizer, spotlighting, guard classifier, output filter
-- **Week 5** — LangGraph agent (3-node StateGraph), PostgreSQL + pgvector RAG tool layer, sentence-transformers embeddings
-- **Week 6** — Self-hosted LangFuse v3 observability stack (Docker), full retrieval metrics instrumentation
+A bilingual (English/Arabic) customer-support triage agent built on LangGraph, with a full decision-governance layer (**ProofLayer**), a multi-agent orchestrator, and SDAIA AI-compliance/risk-management modules layered on top.
 
-## LangFuse v3 Self-Hosted Setup (Week 6)
-
-Replaces the cloud LangFuse with a fully local stack: `langfuse-web`, `langfuse-worker`, PostgreSQL, ClickHouse, Redis, MinIO.
-
-**Step 1 — Fill in secrets**
-```bash
-cd docker
-# Generate crypto values:
-openssl rand -base64 32   # → NEXTAUTH_SECRET
-openssl rand -hex 32      # → LANGFUSE_ENCRYPTION_KEY
-
-# Edit .env.langfuse — replace every CHANGEME_* value:
-#   NEXTAUTH_SECRET, POSTGRES_PASSWORD, LANGFUSE_SALT, LANGFUSE_ENCRYPTION_KEY
-#   LANGFUSE_CLICKHOUSE_PASSWORD, LANGFUSE_REDIS_AUTH, MINIO_ROOT_PASSWORD
-#   LANGFUSE_INIT_USER_EMAIL, LANGFUSE_INIT_USER_PASSWORD
-```
-
-**Step 2 — Start the stack**
-```bash
-# Make sure Docker Desktop is running
-cd docker
-docker compose --env-file .env.langfuse up -d
-```
-
-**Step 3 — Wait for initialization (~2-3 min), then check logs**
-```bash
-docker compose --env-file .env.langfuse logs -f langfuse-web
-# Look for: "Ready" in the output
-
-docker compose --env-file .env.langfuse ps
-# All 6 services should show "healthy" or "Up"
-```
-
-**Step 4 — Create API keys**
-1. Open [http://localhost:3000](http://localhost:3000)
-2. Log in with the email/password from `docker/.env.langfuse` (`LANGFUSE_INIT_USER_*`)
-3. Go to **Project Settings → API Keys → Generate**
-4. Copy `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`
-
-**Step 5 — Wire to the triage agent**
-
-Edit the root `.env`:
-```
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_BASE_URL=http://localhost:3000
-```
-
-**Step 6 — Verify traces appear**
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-curl -s -X POST http://localhost:8000/triage \
-  -H "Content-Type: application/json" \
-  -d '{"message": "I forgot my password", "session_id": "test-1"}'
-# Check http://localhost:3000 — trace should appear within ~10s
-```
-
-**Port conflicts / troubleshooting**
-
-| Symptom | Fix |
-|---|---|
-| `port already allocated` | Change `LANGFUSE_WEB_PORT` or `MINIO_API_PORT` in `docker/.env.langfuse` |
-| `Cannot connect to database` | Internal PG still starting — wait 2-3 min, then `docker compose restart langfuse-web` |
-| No traces in UI | Confirm `LANGFUSE_BASE_URL=http://localhost:3000` (not the cloud URL) in root `.env` |
-| `Docker not found` | Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
-
-> Note: `docker/.env.langfuse` is gitignored — secrets never leave your machine.
-
-## Security Stack (Week 4)
-
-Every request passes through three defense layers before reaching the LLM and three before returning to the client:
-
-```
-POST /triage
-  │
-  ├─ Phase 1 — InputSanitizer        (app/security/input_sanitizer.py)
-  │     • strips control characters
-  │     • enforces 4096 char limit
-  │     • blocks known injection patterns (regex)  → 422
-  │     • flags suspicious encoding (base64/hex)
-  │
-  ├─ Phase 2a — Guard Classifier     (app/security/guard_classifier.py)
-  │     • lightweight LLM call (max_tokens=50) screens for semantic injection
-  │     • confidence > 0.7 → block with 422
-  │     • confidence ≤ 0.7 → flag in Langfuse, allow through
-  │     • fails open on error — never blocks legitimate traffic
-  │
-  ├─ Phase 2b — Spotlighting
-  │     • user message wrapped in <untrusted_input> tags
-  │     • system prompt instructs LLM to treat tags as data boundary
-  │     • reduces injection success rate ~50% → ~2% (Microsoft research)
-  │
-  ├─ LLM classifier (DeepSeek via LiteLLM)
-  │
-  └─ Phase 3 — OutputFilter          (app/security/output_filter.py)
-        • Layer A: PII redaction — email, phone, API keys, credit cards, IPv4
-          (allowlists example.com/support.example.com support addresses)
-        • Layer B: schema validation — intent enum, confidence range, bool types
-        • Schema violations → safe fallback response + Langfuse log
-```
-
-Set `GUARD_MODEL` in `.env` to use a cheaper model for the guard classifier.
-
-## Agent Graph (Week 5)
-
-3-node LangGraph `StateGraph` — `classifier → tool_runner → responder/escalation`:
-
-```
-POST /triage
-  │
-  ├─ [Security stack — Phase 1/2/3]
-  │
-  └─ triage_agent.invoke(state)
-       │
-       ├─ classifier node    → LLM classifies intent (DeepSeek/LiteLLM)
-       │
-       ├─ tool_runner node   → dispatches to DB tool by intent
-       │     • password_reset / billing / technical_support → faq_lookup()
-       │       embeds message → cosine similarity search in pgvector
-       │       returns closest FAQ article from PostgreSQL
-       │     • escalation → ticket_lookup()
-       │       creates support ticket in DB with embedding
-       │
-       └─ responder node     → formats response (or escalation_node if flagged)
-```
-
-**Database:** PostgreSQL 17 + pgvector 0.8.2 — 384-dim vectors via `all-MiniLM-L6-v2`
-
-**Seeded data:** 6 FAQ articles (2 per intent) + 6 support tickets
+Every decision the agent makes — classification, reflection, tool calls, the final response — is recorded as a queryable, replayable graph, not just a log line.
 
 ## Architecture
 
-The app follows a multi-agent chatbot pattern:
+```
+POST /triage  (English)          POST /triage  (Arabic, auto-detected)
+      │                                  │
+      ├─ Zero Trust security stack ──────┤   (see "Security Stack" below)
+      │                                  │
+      └─ LangGraph pipeline (app/agent_graph.py, app_ar/agent_graph.py)
+           │
+           ├─ classifier      → LLM intent classification (DeepSeek via LiteLLM)
+           ├─ reflect         → LLM-as-judge second opinion; can override the
+           │                    classifier when it's confidently wrong
+           ├─ tool_runner     → dispatches to a DB tool by (possibly revised) intent:
+           │                      • faq_lookup()  — generic FAQ table, pgvector search
+           │                      • kb_lookup()   — private company knowledge base
+           │                        (product_inquiry), pgvector search, bge-m3 embeddings
+           │                      • ticket_lookup() — creates an escalation ticket
+           ├─ store_memory    → per-session conversation memory + long-term precedents
+           └─ responder       → LLM synthesizes a natural, grounded reply from the
+                                 retrieved content (never pastes it verbatim)
+```
 
-- **Agent state** (per-prompt, ephemeral): tracked via `@observe()` spans on `classify()`. Each LLM call creates a Langfuse span capturing input, output, and latency.
-- **Conversation memory** (per-session, persistent): tracked via Langfuse sessions. Pass `session_id` in the request body and all traces sharing that ID are grouped into one Langfuse session.
-- **Chatbot orchestrator**: the FastAPI `POST /triage` endpoint routes prompts to the classifier agent, optionally attached to a session context.
-- **LiteLLM proxy** (optional): sits between the app and the LLM providers — logs cost per request, routes to cheap model first, falls back to expensive model if needed.
+Every node's Thought → Action → Observation is written to **ProofLayer** (`audit/`, `app/prooflayer_graph.py`) as a decision graph (`pl_nodes`/`pl_edges` in Postgres), queryable via `/api/v1/decisions/{id}/trace`, `/replay`, and `/blame` — full governance, not just an audit log.
+
+On top of the core triage agent:
+
+- **Multi-agent orchestrator** (`orchestrator/`) — a router plus 7 domain specialists (billing, technical, sales, retention, loyalty, complaints, fraud detection), reachable via `POST /triage/multi`.
+- **SDAIA compliance module** (`app/sdaia_api.py`, `prooflayer-sdaia/`) — risk classification, incident tracking, safety reports, and ethics labels for agents operating under Saudi AI governance requirements.
+- **SDAIA-P145 RMF** (`app/rmf_api.py`, `app/rmf_core.py`) — the National AI Risk Management Framework's five-stage risk cycle (context → risk register → assessment → treatment → review).
+- **Agent Passport** (`app/passport_api.py`) — a single per-agent credential card assembled from the behavioral-contract registry and (when present) SDAIA compliance records.
+- **Durable execution** (`app/temporal_routes.py`) — optional Temporal-backed `/triage/durable` for workflows that must survive a crash mid-escalation.
+
+## Repo layout
+
+```
+app/            English triage agent, ProofLayer core, SDAIA/RMF/Passport APIs, admin UI backend
+app_ar/         Arabic triage agent (mirrors app/, Arabic-first prompts and security)
+shared/         Code genuinely shared between app/ and app_ar/ — embeddings, precedent memory
+orchestrator/   Multi-agent router + specialist agents
+audit/          ProofLayer's append-only decision ledger (hash-chained JSONL)
+prooflayer-sdaia/  Standalone SDAIA compliance scaffold (its own package, own tests)
+config/         Orchestrator agent/routing config (contact_center.yaml)
+knowledge_base/ Gitignored raw KB spreadsheet + scripts/ingest_knowledge_base.py output
+scripts/        Ingestion, retrieval eval harness, demo seeders
+tests/          pytest suite (132+ tests, `-m "not llm"` skips real-LLM-call tests)
+ui/             Static admin dashboard (ProofLayer trace viewer, RMF tab, etc.)
+docker/         Full Docker Compose stack (this app + self-hosted LangFuse + Temporal)
+proxy/          Optional LiteLLM proxy for cost tracking / model fallback
+```
+
+## Quick start — Docker Compose (recommended)
+
+Brings up the triage agent, its Postgres (pgvector), and a full self-hosted LangFuse observability stack in one command.
+
+```bash
+cd docker
+cp ../.env.example ../.env    # fill in DEEPSEEK_API_KEY at minimum
+docker compose up -d triage-agent
+```
+
+Open `http://localhost:8000/ui/admin.html` for the admin dashboard, or hit the API directly:
+
+```bash
+curl -s -X POST http://localhost:8000/triage \
+  -H "Content-Type: application/json" \
+  -d '{"message": "I forgot my password", "session_id": "test-1"}'
+
+# Arabic is auto-detected from the message text — same endpoint:
+curl -s -X POST http://localhost:8000/triage \
+  -H "Content-Type: application/json" \
+  -d '{"message": "نسيت كلمة المرور", "session_id": "test-ar-1"}'
+```
+
+The container bakes the embedding model into the image at build time and runs CPU-only by default (see "Embeddings & RAG" below for GPU).
+
+**First build is slow** (CUDA-capable torch + the embedding model, several GB) — subsequent builds reuse Docker's layer cache unless `requirements.txt`, `Dockerfile`, or the embedding model changes.
+
+## Embeddings & RAG
+
+Semantic search (both the generic FAQ table and the private company knowledge base) runs on **BAAI/bge-m3** — a real multilingual embedding model, chosen specifically because Arabic queries need genuine cross-lingual understanding, not just a fast English model. Loaded once and shared across every consumer via `shared/embeddings.py`.
+
+**GPU (optional):** `docker-compose.yml` reserves a GPU for the `triage-agent` service, and `shared/embeddings.py` auto-detects CUDA and uses fp16 automatically. It's **forced to CPU by default** (`EMBEDDING_DEVICE: "cpu"` in `docker-compose.yml`) because on a resource-constrained host, the CUDA runtime's memory footprint (~2GB host RAM + ~3.4GB VRAM for this model) can leave too little headroom for Docker Desktop's own networking to stay reliable. Delete that line to re-enable GPU once you've confirmed the host has headroom (`docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` should succeed first).
+
+**Ingesting the knowledge base:**
+```bash
+pip install -r requirements-kb.txt   # pandas + openpyxl, not needed at runtime
+# Drop your spreadsheet(s) in knowledge_base/raw/ (gitignored), then:
+python scripts/ingest_knowledge_base.py
+```
+Safe to re-run — each file's previously-ingested chunks are deleted before re-inserting, so editing the spreadsheet and re-running keeps the DB in sync.
+
+**Measuring retrieval quality** — don't change the embedding model, the retrieval threshold, or the ranking logic without running this first:
+```bash
+python scripts/eval_kb_retrieval.py
+```
+Runs a golden query/expected-answer set against the real, production `find_kb_chunk()` and reports accuracy plus a misses list. This is what caught the swap from `all-MiniLM-L6-v2` to `bge-m3` taking Arabic retrieval accuracy from 38% to 90% on this KB — and what caught a leftover keyword-overlap heuristic (tuned for the old, weaker model) actively hurting results once the embedding model improved.
+
+## Security Stack
+
+Every request passes through defense layers before reaching the LLM and after leaving it:
+
+```
+POST /triage
+  │
+  ├─ Phase 1 — InputSanitizer
+  │     • strips control characters, enforces a length limit
+  │     • blocks known injection patterns (regex) → 422
+  │     • flags suspicious encoding (base64/hex)
+  │
+  ├─ Phase 2a — Guard Classifier
+  │     • lightweight LLM call screens for semantic prompt injection
+  │     • confidence > 0.7 → block with 422
+  │     • fails open on error — never blocks legitimate traffic on an LLM hiccup
+  │
+  ├─ Phase 2b — Spotlighting
+  │     • user message wrapped in <untrusted_input> tags
+  │     • system prompt instructs the LLM to treat tags as a data boundary
+  │
+  ├─ LangGraph pipeline (classifier → reflect → tool_runner → responder)
+  │
+  └─ Phase 3 — OutputFilter
+        • PII redaction — email, phone, API keys, credit cards, IPv4
+        • schema validation — intent enum, confidence range, bool types
+        • violations → safe fallback response, logged
+```
 
 ## Endpoints
 
-- `GET /health` — verify the server is alive
-- `POST /triage` — classify a customer message
+| Area | Method | Path | Purpose |
+|---|---|---|---|
+| Core | GET | `/health` | Liveness check |
+| Core | POST | `/triage` | Classify + respond (language auto-detected) |
+| Core | POST | `/triage/resume` | Approve/decline an escalation that's pending human review |
+| Multi-agent | POST | `/triage/multi` | Route through the 7-specialist orchestrator instead of the single agent |
+| Durable | POST | `/triage/durable` | Temporal-backed workflow, survives a crash mid-run |
+| ProofLayer | GET | `/api/v1/decisions/{id}/trace` | Full Thought→Action→Observation trace for one decision |
+| ProofLayer | GET | `/api/v1/decisions/{id}/replay` | Replay a past decision against current policy |
+| ProofLayer | GET | `/api/v1/decisions/{id}/blame` | Which policy/precedent drove this decision |
+| ProofLayer | GET | `/api/v1/compliance/iso-42001` | ISO 42001 compliance summary |
+| ProofLayer | GET | `/api/v1/compliance/report.pdf` | Downloadable compliance report |
+| SDAIA | GET | `/api/v1/sdaia/overview` | Fleet-wide SDAIA risk overview |
+| SDAIA | GET | `/api/v1/sdaia/agents/{id}/deployment-check` | Is this agent cleared to deploy? |
+| RMF | POST | `/api/v1/rmf/risks` | Register a risk in the P145 five-stage cycle |
+| RMF | GET | `/api/v1/rmf/matrix` | Current risk matrix |
+| Passport | GET | `/api/v1/passport/{agent_name}` | Per-agent credential card |
 
-**Request:**
+See each router file (`app/prooflayer_api.py`, `app/sdaia_api.py`, `app/rmf_api.py`, `app/multi_agent_routes.py`, `app/passport_api.py`) for the complete list — this table covers the ones you'll reach for first.
+
+**`POST /triage` request:**
 ```json
-{
-  "message": "I want to speak to a manager",
-  "session_id": "user-123"
-}
+{ "message": "I want to speak to a manager", "session_id": "user-123" }
 ```
 
 **Response:**
@@ -167,117 +163,90 @@ The app follows a multi-agent chatbot pattern:
   "intent": "escalation",
   "response": "I understand your frustration...",
   "confidence": 0.95,
-  "needs_escalation": true
+  "needs_escalation": true,
+  "interrupted": false,
+  "thread_id": null
 }
 ```
 
-## Setup
+## Manual (non-Docker) setup
 
-**Step 1 — Install dependencies**
 ```bash
+# 1. Dependencies
 pip install -r requirements.txt
-```
 
-**Step 2 — Configure your API keys**
-```bash
-cp .env.example .env
-# Edit .env and fill in your keys
-```
+# 2. Configure
+cp .env.example .env   # fill in DEEPSEEK_API_KEY at minimum
 
-Get a DeepSeek key at [platform.deepseek.com](https://platform.deepseek.com/) (~$0.14/1M tokens).
-Get Langfuse keys at [cloud.langfuse.com](https://cloud.langfuse.com/) (free tier).
-
-**Step 3 — Set up PostgreSQL (Week 5+)**
-```bash
-# Install PostgreSQL 17 + pgvector (Ubuntu/Debian)
+# 3. PostgreSQL 17 + pgvector
 sudo apt install postgresql-17 postgresql-17-pgvector
 sudo service postgresql start
-
-# Create database and enable extension
 sudo -u postgres psql -c "CREATE DATABASE triage_agent;"
 sudo -u postgres psql -d triage_agent -c "CREATE EXTENSION vector;"
 
-# Apply schema and seed data
-sudo -u postgres psql -d triage_agent -f app/schema.sql
-python app/seed_data.py
-# → Seeded 6 FAQs and 6 tickets
-```
+python -m app.seed_data          # 6 demo FAQ articles + 6 tickets
+python scripts/ingest_knowledge_base.py   # your real KB, if you have one
 
-**Step 4 — Start the server**
-```bash
+# 4. Run
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Step 5 — Test it**
+## Testing
+
 ```bash
-# Health check
-curl http://localhost:8000/health
-# → {"status":"ok"}
+# Full suite, skipping tests that make real LLM calls
+pytest -q -m "not llm"
 
-# Classify a message
-curl -s -X POST http://localhost:8000/triage \
-  -H "Content-Type: application/json" \
-  -d '{"message": "I want to speak to a manager"}'
-# → {"intent":"escalation","response":"...","confidence":0.95,"needs_escalation":true}
+# Include real-LLM-call tests too (costs money, needs DEEPSEEK_API_KEY)
+pytest -q
 
-# With session tracking
-curl -s -X POST http://localhost:8000/triage \
-  -H "Content-Type: application/json" \
-  -d '{"message": "I need a refund", "session_id": "user-123"}'
+# Retrieval-quality regression (see "Embeddings & RAG" above)
+python scripts/eval_kb_retrieval.py
 
-# Empty message guard
-curl -s -X POST http://localhost:8000/triage \
-  -H "Content-Type: application/json" \
-  -d '{"message": ""}'
-# → {"detail":"message cannot be empty"}
+# Lint
+ruff check .
 ```
 
-## Run the Eval Harness
-
-**pytest — unit accuracy (calls LLM directly)**
+`prooflayer-sdaia/` has its own test suite (`prooflayer-sdaia/conftest.py` deliberately excludes `P145/` from the same collection run — both it and `prooflayer-sdaia/app` are packages literally named `app`, and pytest can only resolve one `app` per process). Run it separately:
 ```bash
-pytest tests/ -v -s
+cd prooflayer-sdaia && pytest -q
 ```
-Runs 12 labeled test cases and prints a per-intent accuracy table.
 
-**promptfoo — integration eval (calls the running API)**
+## Self-hosted LangFuse (observability)
+
+`docker compose up -d` brings up a full self-hosted LangFuse v3 stack (`langfuse-web`, `langfuse-worker`, its own Postgres, ClickHouse, Redis, MinIO) alongside the triage agent.
+
+1. Fill in `docker/.env.langfuse` (gitignored — secrets never leave your machine):
+   ```bash
+   openssl rand -base64 32   # → NEXTAUTH_SECRET
+   openssl rand -hex 32      # → LANGFUSE_ENCRYPTION_KEY
+   # then replace every CHANGEME_* value in docker/.env.langfuse
+   ```
+2. `docker compose --env-file docker/.env.langfuse up -d`
+3. Open `http://localhost:3000`, log in with `LANGFUSE_INIT_USER_*`, generate API keys under Project Settings.
+4. Put `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_BASE_URL=http://localhost:3000` in the root `.env`.
+
+On a memory-constrained host, this stack (plus the optional Temporal stack) is the first thing worth stopping if Docker Desktop's networking gets unreliable — none of it is in `/triage`'s actual request path:
 ```bash
-# Start the server first, then:
-cd tests
-promptfoo eval -c promptfooconfig.yaml --no-cache
-
-# View HTML report
-promptfoo view
-```
-Hits the live `/triage` endpoint, checks each response's `intent` field, and reports pass/fail per test case.
-
-## LiteLLM Proxy (optional)
-
-Adds cost tracking, model routing, and automatic fallback between providers.
-
-```
-Agent → LiteLLM Proxy (port 4000) → cheap-classifier (DeepSeek $0.14/M)
-                                   → expensive-fallback (Claude Haiku, if needed)
+docker stop docker-langfuse-web-1 docker-langfuse-worker-1 docker-clickhouse-1 \
+            docker-redis-1 docker-minio-1 docker-temporal-1 docker-temporal-ui-1 \
+            docker-temporal-postgresql-1
 ```
 
-**Start the proxy:**
-```bash
-cd proxy
-litellm --config config.yaml --port 4000
-```
+## Environment variables
 
-**Enable in `.env`:**
-```
-LITELLM_PROXY_URL=http://localhost:4000
-LITELLM_MASTER_KEY=your_proxy_master_key_here
-```
+| Variable | Required | Purpose |
+|---|---|---|
+| `DEEPSEEK_API_KEY` | Yes | Classifier/reflection/response LLM calls |
+| `DATABASE_URL` | Yes | Postgres connection (Docker Compose sets this for you) |
+| `OPENROUTER_API_KEY` | No | Only for call sites explicitly using an `openrouter/` model |
+| `LLM_MODEL` / `AR_LLM_MODEL` | No | Override the default model per language |
+| `GUARD_MODEL` | No | Cheaper model for the injection guard classifier |
+| `EMBEDDING_DEVICE` | No | Force `cpu` or `cuda` for embeddings; auto-detects if unset |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_BASE_URL` | No | Observability tracing |
+| `LITELLM_PROXY_URL` / `LITELLM_MASTER_KEY` | No | Route through the optional LiteLLM proxy instead of calling providers directly |
 
-Or run with Docker:
-```bash
-cd proxy
-docker build -t triage-proxy .
-docker run -p 4000:4000 --env-file ../.env triage-proxy
-```
+See `.env.example` for the full, current list with inline comments.
 
 ## Intents
 
@@ -286,14 +255,7 @@ docker run -p 4000:4000 --env-file ../.env triage-proxy
 | `password_reset` | "I forgot my password", "my account is locked" |
 | `billing` | "I've been double charged", "I need a refund" |
 | `technical_support` | "the app keeps crashing", "I'm getting a 500 error" |
+| `product_inquiry` | "what packages do you offer", "how do I activate call forwarding" |
 | `escalation` | "get me your manager", "I want to file a complaint" |
-| `unknown` | anything unrecognized |
-
-## Switching Models
-
-Change `LLM_MODEL` in your `.env`:
-```
-LLM_MODEL=cheap-classifier        # via proxy (default)
-LLM_MODEL=deepseek/deepseek-chat  # direct, no proxy
-LLM_MODEL=claude-haiku-4-5-20251001  # Claude Haiku direct
-```
+| `greeting` | "hi", "السلام عليكم" |
+| `unknown` | anything the classifier and reflection both can't place |
