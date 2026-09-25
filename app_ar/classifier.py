@@ -1,4 +1,4 @@
-"""Arabic LLM classifier — Qwen via OpenRouter with LiteLLM proxy fallback."""
+"""Arabic LLM classifier — DeepSeek with LiteLLM proxy fallback."""
 
 from dotenv import load_dotenv
 
@@ -16,8 +16,8 @@ _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
 
 
 def _strip_json_fence(raw: str) -> str:
-    """Qwen (via OpenRouter) sometimes wraps JSON responses in a markdown
-    code fence despite being told to return raw JSON. Strip it before parsing."""
+    """Some models wrap JSON responses in a markdown code fence despite
+    being told to return raw JSON. Strip it before parsing."""
     raw = raw.strip()
     match = _JSON_FENCE_RE.match(raw)
     return match.group(1) if match else raw
@@ -63,7 +63,7 @@ class ClassifierOutput(BaseModel):
 
 @observe(name="classify_ar", as_type="generation")
 def classify_ar(message: str) -> ClassifierOutput:
-    """Classify an Arabic customer message. Uses LiteLLM proxy if configured, else OpenRouter."""
+    """Classify an Arabic customer message. Uses LiteLLM proxy if configured, else DeepSeek directly."""
     proxy_url = os.getenv("LITELLM_PROXY_URL")
     proxy_key = os.getenv("LITELLM_MASTER_KEY")
 
@@ -76,14 +76,11 @@ def classify_ar(message: str) -> ClassifierOutput:
             "api_key": proxy_key,
         }
     else:
-        # Direct OpenRouter call for Qwen
-        model = os.getenv("AR_LLM_MODEL", "openrouter/qwen/qwen3-235b-a22b")
-        call_kwargs = {
-            "model": model,
-            "api_base": "https://openrouter.ai/api/v1",
-            "api_key": os.getenv("OPENROUTER_API_KEY"),
-            "extra_body": {"thinking": {"type": "disabled"}},
-        }
+        # Direct DeepSeek call — litellm reads DEEPSEEK_API_KEY from the
+        # environment for "deepseek/"-prefixed models, so no api_key kwarg
+        # needed here (matches app/classifier.py's English-side pattern).
+        model = os.getenv("AR_LLM_MODEL", "deepseek/deepseek-chat")
+        call_kwargs = {"model": model}
 
     safe_message = f"<untrusted_input>\n{message}\n</untrusted_input>"
     messages = [

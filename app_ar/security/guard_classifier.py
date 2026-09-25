@@ -31,8 +31,21 @@ GUARD_SYSTEM_PROMPT_AR = """أنت حارس أمن لوكيل دعم العمل�
 
 def guard_classify_ar(message: str) -> GuardResult:
     """Screen an Arabic message for prompt injection."""
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    model = os.getenv("AR_LLM_MODEL", "openrouter/qwen/qwen3.5-27b")
+    # This call used to be hardcoded to OpenRouter (api_base below) while
+    # reading its model from AR_LLM_MODEL — the *classifier's* env var, set
+    # to "deepseek/deepseek-chat", which isn't a valid OpenRouter model id.
+    # Every guard call 400'd ("Model ID 'deepseek-chat' is ambiguous"),
+    # silently disabling the Arabic prompt-injection guard (fails open on
+    # exception, below). Fixing the model id alone then surfaced that the
+    # OPENROUTER_API_KEY on this account also has zero credits (402
+    # "Insufficient credits"), so it would keep failing regardless.
+    # Defaulting to DeepSeek instead — already funded and used everywhere
+    # else in this app. Set AR_GUARD_MODEL / AR_GUARD_API_BASE /
+    # AR_GUARD_API_KEY to go back to OpenRouter+Qwen once that account has
+    # credits.
+    model = os.getenv("AR_GUARD_MODEL", "deepseek/deepseek-chat")
+    api_base = os.getenv("AR_GUARD_API_BASE")
+    api_key = os.getenv("AR_GUARD_API_KEY") or os.getenv("DEEPSEEK_API_KEY")
 
     try:
         response = litellm.completion(
@@ -42,9 +55,9 @@ def guard_classify_ar(message: str) -> GuardResult:
                 {"role": "user", "content": message},
             ],
             temperature=0,
-            max_tokens=50,
-            api_base="https://openrouter.ai/api/v1",
-            api_key=api_key,
+            max_tokens=150,
+            **({"api_base": api_base} if api_base else {}),
+            **({"api_key": api_key} if api_key else {}),
         )
         raw = response.choices[0].message.content
         data = json.loads(raw)

@@ -18,7 +18,10 @@ from app.database import get_conn
 
 router = APIRouter(prefix="/api/v1/sdaia", tags=["SDAIA"])
 
-_LEVEL_RANK = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+# §7.2.1-7.2.4 of the SDAIA Responsible AI Policy: مخاطر حرجة (Critical) /
+# عالية (High) / محدودة (Limited) / بسيطة أو منعدمة (Minimal), lowest to
+# highest — must match prooflayer-sdaia/app/sdaia_risk.py LEVELS.
+_LEVEL_RANK = {"MINIMAL": 0, "LIMITED": 1, "HIGH": 2, "CRITICAL": 3}
 
 
 def _cursor(conn):
@@ -47,7 +50,7 @@ def _latest_risk_overall_by_agent(cur) -> dict[str, dict]:
     by_agent: dict[str, dict] = {}
     for row in cur.fetchall():
         entry = by_agent.setdefault(
-            row["agent_id"], {"overall": "LOW", "categories": [], "assessed_at": row["assessed_at"]}
+            row["agent_id"], {"overall": "MINIMAL", "categories": [], "assessed_at": row["assessed_at"]}
         )
         entry["categories"].append(
             {"category": row["category"], "level": row["level"], "rationale": row["rationale"]}
@@ -194,7 +197,7 @@ def sdaia_agent_detail(agent_id: str) -> dict:
 @router.get("/incidents")
 def sdaia_incidents(
     open_only: bool = Query(False, description="Only unresolved incidents"),
-    severity: str | None = Query(None, description="Filter: LOW, MEDIUM, HIGH, CRITICAL"),
+    severity: str | None = Query(None, description="Filter: MINIMAL, LIMITED, HIGH, CRITICAL"),
     agent_id: str | None = Query(None, description="Filter by agent"),
     limit: int = Query(50, description="Max results"),
 ) -> list[dict]:
@@ -255,36 +258,47 @@ def sdaia_safety_reports(
 # ═══════════════════════════════════════════════════════════════════════════
 # Ethics Label Auto-Assessment
 # ═══════════════════════════════════════════════════════════════════════════
-# Evidence-based checklist taxonomy (aware -> adopter -> committed -> trusted
-# -> pioneer), separate from the weighted-score model in
+# Evidence-based checklist taxonomy for the SDAIA Responsible AI Policy §6.8
+# 5-tier scale (واعٍ/Aware -> متبنٍ/Adopting -> ملتزم/Committed -> موثوق/Trusted
+# -> رائد/Leading), separate from the weighted-score model in
 # prooflayer-sdaia/app/sdaia_labels.py — both write to the same ethics_labels
 # table (tier/tier_name_ar/tier_name_en/score); whichever ran most recently
 # for an agent is "current" (existing DISTINCT ON ... ORDER BY computed_at
 # DESC lookups already pick the latest row, so no extra versioning column is
-# needed here). Evidence signals are read from real columns already in this
-# schema; items with no real signal (continuous_monitoring, third_party_test,
-# cross_agent_governance, benchmarking, standards_contribution) are left
-# False rather than guessed.
+# needed here). The two vocabularies must stay in sync — see the module
+# docstring in sdaia_labels.py. Evidence signals are read from real columns
+# already in this schema; items with no real signal (continuous_monitoring,
+# third_party_test, cross_agent_governance, benchmarking,
+# standards_contribution) are left False rather than guessed.
 
-ETHICS_LABELS_EN = ["aware", "adopter", "committed", "trusted", "pioneer"]
+ETHICS_LABELS_EN = ["aware", "adopting", "committed", "trusted", "leading"]
 ETHICS_LABELS_AR = {
-    "aware": "واعي", "adopter": "متبني",
-    "committed": "ملتزم", "trusted": "موثوق", "pioneer": "رائد",
+    "aware": "واعٍ", "adopting": "متبنٍ",
+    "committed": "ملتزم", "trusted": "موثوق", "leading": "رائد",
+}
+
+# §7.2.2/§7.2.3: minimum ethics-label tier (1-indexed into ETHICS_LABELS_EN)
+# required per risk level before deployment. §7.2.4 "prefers" (does not
+# require) Aware for Minimal risk, so it's omitted here (nothing to gate).
+# §7.8 bans Critical risk outright regardless of label — handled separately.
+_MIN_LABEL_TIER_FOR_RISK = {
+    "HIGH": 4,     # موثوق / Trusted
+    "LIMITED": 3,  # ملتزم / Committed
 }
 
 LABEL_REQUIREMENTS = {
     "aware": ["agent_registered", "risk_classified"],
-    "adopter": ["pii_classified", "safety_barriers"],
+    "adopting": ["pii_classified", "safety_barriers"],
     "committed": ["safety_reports_done", "human_oversight", "incident_response"],
     "trusted": ["continuous_monitoring", "incident_reported", "third_party_test"],
-    "pioneer": ["cross_agent_governance", "benchmarking", "standards_contribution"],
+    "leading": ["cross_agent_governance", "benchmarking", "standards_contribution"],
 }
 
 LABEL_PREREQUISITES = {
-    "aware": [], "adopter": ["aware"],
-    "committed": ["aware", "adopter"],
-    "trusted": ["aware", "adopter", "committed"],
-    "pioneer": ["aware", "adopter", "committed", "trusted"],
+    "aware": [], "adopting": ["aware"],
+    "committed": ["aware", "adopting"],
+    "trusted": ["aware", "adopting", "committed"],
+    "leading": ["aware", "adopting", "committed", "trusted"],
 }
 
 
@@ -413,42 +427,91 @@ def sdaia_assess_label(agent_id: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Pre-Deployment Gate (illustrative 10-item checklist)
+# Pre-Deployment Gate
 # ═══════════════════════════════════════════════════════════════════════════
-# Reuses _gather_label_evidence so the same underlying signals back both the
-# ethics label and this gate. IDs are plain sequence numbers, not section
-# citations — see the module-level "governance scaffold" caveat at the top
-# of this file.
+# The first two checks below are direct enforcement of the policy's actual
+# launch rules (§7.8, §7.2.2, §7.2.3) — cross-referencing risk level against
+# ethics-label tier, not a single evidence flag, so they're computed
+# separately in sdaia_deployment_check rather than listed in
+# PRE_DEPLOYMENT_CHECKS. The remaining items reuse _gather_label_evidence so
+# the same underlying signals back both the ethics label and this gate;
+# their IDs are plain sequence numbers, not section citations.
 
 PRE_DEPLOYMENT_CHECKS = [
-    {"id": "1",  "title": "Safety barriers active (human-in-the-loop autonomy)", "key": "safety_barriers",      "severity": "blocker"},
-    {"id": "2",  "title": "Safety report on file",                              "key": "safety_reports_done",  "severity": "blocker"},
-    {"id": "3",  "title": "Misuse/oversight scenarios exercised",               "key": "human_oversight",      "severity": "blocker"},
-    {"id": "4",  "title": "Incident response demonstrated",                     "key": "incident_response",    "severity": "blocker"},
-    {"id": "5",  "title": "Expert / safety-report review cadence",              "key": "safety_reports_done",  "severity": "warning"},
-    {"id": "6",  "title": "Data classification (PII) assessed",                 "key": "pii_classified",       "severity": "blocker"},
-    {"id": "7",  "title": "Risk classification complete",                      "key": "risk_classified",      "severity": "blocker"},
-    {"id": "8",  "title": "Risk monitoring active",                            "key": "risk_classified",      "severity": "warning"},
-    {"id": "9",  "title": "Continuous post-deployment monitoring",             "key": "continuous_monitoring","severity": "warning"},
-    {"id": "10", "title": "Periodic update / re-assessment cadence",           "key": "safety_reports_done",  "severity": "info"},
+    {"id": "3",  "title": "Safety barriers active (human-in-the-loop autonomy)", "key": "safety_barriers",      "severity": "blocker"},
+    {"id": "4",  "title": "Safety report on file",                              "key": "safety_reports_done",  "severity": "blocker"},
+    {"id": "5",  "title": "Misuse/oversight scenarios exercised",               "key": "human_oversight",      "severity": "blocker"},
+    {"id": "6",  "title": "Incident response demonstrated",                     "key": "incident_response",    "severity": "blocker"},
+    {"id": "7",  "title": "Expert / safety-report review cadence",              "key": "safety_reports_done",  "severity": "warning"},
+    {"id": "8",  "title": "Data classification (PII) assessed",                 "key": "pii_classified",       "severity": "blocker"},
+    {"id": "9",  "title": "Risk classification complete",                      "key": "risk_classified",      "severity": "blocker"},
+    {"id": "10", "title": "Risk monitoring active",                            "key": "risk_classified",      "severity": "warning"},
+    {"id": "11", "title": "Continuous post-deployment monitoring",             "key": "continuous_monitoring","severity": "warning"},
+    {"id": "12", "title": "Periodic update / re-assessment cadence",           "key": "safety_reports_done",  "severity": "info"},
 ]
 
 
-@router.get("/agents/{agent_id}/deployment-check")
-def sdaia_deployment_check(agent_id: str) -> dict:
-    """Run the pre-deployment checklist against the same evidence signals
-    used by ethics-label assessment, and return a go/no-go decision."""
-    with get_conn() as conn:
-        with _cursor(conn) as cur:
-            cur.execute("SELECT name FROM agents WHERE agent_id = %s", (agent_id,))
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-            agent_name = row["name"]
-            evidence = _gather_label_evidence(cur, agent_id)
+def compute_deployment_decision(cur, agent_id: str, agent_name: str) -> dict:
+    """Core §7.8 + §7.2 + evidence-checklist gate computation.
+
+    Pulled out of the route handler so other callers (e.g. app/passport_api.py's
+    Revocation Status field) can get the exact same go/no-go decision instead
+    of re-deriving a simplified version that could silently drift out of sync
+    with this one -- there is exactly one place this policy logic is allowed
+    to live.
+
+    §7.8 and §7.2.2/§7.2.3 are enforced as hard, non-negotiable checks
+    (items 1-2) ahead of the evidence checklist: a Critical-risk agent is
+    always blocked regardless of anything else, and a High/Limited-risk
+    agent needs its current ethics-label tier to already meet the policy's
+    minimum before the rest of the checklist even matters.
+    """
+    evidence = _gather_label_evidence(cur, agent_id)
+
+    risk = _latest_risk_overall_by_agent(cur).get(agent_id)
+    risk_level = risk["overall"] if risk else None
+    ethics = _latest_ethics_label_by_agent(cur).get(agent_id)
+    ethics_tier = ethics["tier"] if ethics else 0
 
     items = []
     blockers = warnings = passed = 0
+
+    # §7.8 — launching a Critical-risk system is prohibited outright, full
+    # stop, no matter how well-governed it is otherwise.
+    critical_ok = risk_level != "CRITICAL"
+    items.append({
+        "id": "1",
+        "title": "Not classified Critical risk (§7.8 — Critical-risk systems may never launch)",
+        "severity": "blocker",
+        "status": "pass" if critical_ok else "fail",
+    })
+    if critical_ok:
+        passed += 1
+    else:
+        blockers += 1
+
+    # §7.2.2/§7.2.3 — High risk requires Trusted (tier 4) at minimum, Limited
+    # risk requires Committed (tier 3) at minimum, before deployment.
+    min_tier = _MIN_LABEL_TIER_FOR_RISK.get(risk_level)
+    label_ok = min_tier is None or ethics_tier >= min_tier
+    min_tier_name = ETHICS_LABELS_AR.get(
+        ETHICS_LABELS_EN[min_tier - 1], ""
+    ) if min_tier else None
+    items.append({
+        "id": "2",
+        "title": (
+            f"Ethics label meets §7.2 minimum for {risk_level} risk"
+            f" (requires ≥ {min_tier_name})" if min_tier else
+            "Ethics label meets §7.2 minimum for current risk level (none required)"
+        ),
+        "severity": "blocker",
+        "status": "pass" if label_ok else "fail",
+    })
+    if label_ok:
+        passed += 1
+    else:
+        blockers += 1
+
     for check in PRE_DEPLOYMENT_CHECKS:
         ok = evidence.get(check["key"], False)
         items.append({
@@ -464,7 +527,9 @@ def sdaia_deployment_check(agent_id: str) -> dict:
         elif check["severity"] == "warning":
             warnings += 1
 
-    if blockers:
+    if not critical_ok:
+        decision, reason = "prohibited", "Critical-risk systems may not launch under §7.8, regardless of governance evidence"
+    elif blockers:
         decision, reason = "blocked", f"{blockers} blocker(s) unresolved"
     elif warnings:
         decision, reason = "warning", f"{warnings} warning(s) — deploy with caution"
@@ -473,9 +538,23 @@ def sdaia_deployment_check(agent_id: str) -> dict:
 
     return {
         "agent_id": agent_id,
+        "risk_level": risk_level,
+        "ethics_tier": ethics_tier or None,
         "agent_name": agent_name,
         "decision": decision,
         "reason": reason,
         "summary": {"passed": passed, "blockers": blockers, "warnings": warnings, "total": len(items)},
         "items": items,
     }
+
+
+@router.get("/agents/{agent_id}/deployment-check")
+def sdaia_deployment_check(agent_id: str) -> dict:
+    """Run the pre-deployment checklist and return a go/no-go decision."""
+    with get_conn() as conn:
+        with _cursor(conn) as cur:
+            cur.execute("SELECT name FROM agents WHERE agent_id = %s", (agent_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+            return compute_deployment_decision(cur, agent_id, row["name"])

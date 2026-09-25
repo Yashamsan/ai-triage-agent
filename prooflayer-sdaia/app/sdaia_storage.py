@@ -20,7 +20,7 @@ import sqlite3
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS agents (
@@ -111,7 +111,7 @@ class SDAIAStorage:
     ":memory:".
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         db_path = db_path or os.getenv("SDAIA_DSN", ":memory:")
         self.is_postgres = _is_postgres_dsn(db_path)
 
@@ -180,7 +180,7 @@ class SDAIAStorage:
         description: str = "",
         handles_pii: bool = False,
         autonomy_level: str = "assisted",
-        pl_agent_id: Optional[str] = None,
+        pl_agent_id: str | None = None,
     ) -> dict:
         """Register (or update) an agent. pl_agent_id is an optional link to
         this repo's pl_agents(agent_id) registry for cross-referencing —
@@ -214,7 +214,7 @@ class SDAIAStorage:
         self.conn.commit()
         return self.get_agent(agent_id)
 
-    def get_agent(self, agent_id: str) -> Optional[dict]:
+    def get_agent(self, agent_id: str) -> dict | None:
         cur = self._cursor()
         cur.execute(self._q("SELECT * FROM agents WHERE agent_id = ?"), (agent_id,))
         row = cur.fetchone()
@@ -295,14 +295,14 @@ class SDAIAStorage:
         new_id = self._insert_and_get_id(sql, (agent_id, severity, category, description, _now()))
         return self.get_incident(new_id)
 
-    def get_incident(self, incident_id: int) -> Optional[dict]:
+    def get_incident(self, incident_id: int) -> dict | None:
         cur = self._cursor()
         cur.execute(self._q("SELECT * FROM incidents WHERE id = ?"), (incident_id,))
         row = cur.fetchone()
         return dict(row) if row else None
 
     def list_incidents(
-        self, agent_id: Optional[str] = None, severity: Optional[str] = None
+        self, agent_id: str | None = None, severity: str | None = None
     ) -> list[dict]:
         query = "SELECT * FROM incidents WHERE 1=1"
         params: list[Any] = []
@@ -350,7 +350,7 @@ class SDAIAStorage:
         sql = self._q("INSERT INTO safety_reports (agent_id, report, generated_at) VALUES (?, ?, ?)")
         return self._insert_and_get_id(sql, (agent_id, self._json_param(report), _now()))
 
-    def get_latest_safety_report(self, agent_id: str) -> Optional[dict]:
+    def get_latest_safety_report(self, agent_id: str) -> dict | None:
         cur = self._cursor()
         cur.execute(
             self._q("SELECT * FROM safety_reports WHERE agent_id = ? ORDER BY id DESC LIMIT 1"),
@@ -374,7 +374,7 @@ class SDAIAStorage:
         )
         return self._insert_and_get_id(sql, (agent_id, tier, tier_name_ar, tier_name_en, score, _now()))
 
-    def get_latest_ethics_label(self, agent_id: str) -> Optional[dict]:
+    def get_latest_ethics_label(self, agent_id: str) -> dict | None:
         cur = self._cursor()
         cur.execute(
             self._q("SELECT * FROM ethics_labels WHERE agent_id = ? ORDER BY id DESC LIMIT 1"),

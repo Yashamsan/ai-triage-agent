@@ -2,8 +2,8 @@
 
 import json
 import uuid
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -30,7 +30,7 @@ class DecisionTransaction:
         if not self.transaction_id:
             self.transaction_id = str(uuid.uuid4())
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
         if not self.input_hash and self.input_preview:
             import hashlib
             self.input_hash = hashlib.sha256(

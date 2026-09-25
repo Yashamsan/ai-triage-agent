@@ -641,6 +641,97 @@
   #agents-back:hover { color: var(--text); border-color: var(--text); }
   .agents-title { font-size: 14px; font-weight: 600; }
   .agents-sub { font-size: 11px; color: var(--muted); margin-left: 4px; }
+  .ac-passport-btn {
+    font-size: 10px; margin-top: 10px; width: 100%;
+    background: rgba(188,140,255,.1); color: var(--purple);
+    border: 1px solid rgba(188,140,255,.3); border-radius: 4px;
+    padding: 5px 8px; cursor: pointer; font-family: inherit;
+  }
+  .ac-passport-btn:hover { background: rgba(188,140,255,.2); }
+
+  /* ── Agent Passport modal ── */
+  #passport-overlay {
+    display: none; position: fixed; inset: 0; z-index: 50;
+    background: rgba(1,4,9,.72);
+    align-items: flex-start; justify-content: center;
+    overflow-y: auto; padding: 40px 20px;
+  }
+  #passport-overlay.active { display: flex; }
+  .passport-card {
+    width: 100%; max-width: 720px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .passport-head {
+    padding: 18px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  }
+  .passport-head-title { font-size: 10px; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+  .passport-head-name { font-size: 17px; font-weight: 700; margin-top: 3px; }
+  .passport-head-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .passport-close {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 4px; width: 26px; height: 26px; cursor: pointer; flex-shrink: 0;
+  }
+  .passport-close:hover { color: var(--text); border-color: var(--text); }
+  .passport-status-badge {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+    padding: 4px 10px; border-radius: 5px; margin-top: 8px;
+  }
+  .passport-body { padding: 4px 20px 18px; }
+  .passport-section {
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .passport-section:last-child { border-bottom: none; }
+  .passport-section-label {
+    font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 7px;
+  }
+  .passport-section-body { font-size: 12px; color: var(--text); line-height: 1.6; }
+  .passport-untracked { color: var(--muted); font-style: italic; }
+  .passport-kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; }
+  .passport-kv dt { color: var(--muted); }
+  .passport-kv dd { color: var(--text); text-align: right; }
+  .passport-tag-row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .passport-tag {
+    font-size: 10px; background: rgba(88,166,255,.1); color: var(--accent);
+    border: 1px solid rgba(88,166,255,.25); border-radius: 4px; padding: 2px 7px;
+  }
+  .passport-limit-tag {
+    font-size: 10px; background: rgba(210,153,34,.1); color: var(--yellow);
+    border: 1px solid rgba(210,153,34,.3); border-radius: 4px; padding: 2px 7px;
+  }
+
+  /* ── RMF (P145) ── */
+  .rmf-subtabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .rmf-subtab {
+    font-size: 11px; background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-family: inherit;
+  }
+  .rmf-subtab.active { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,.08); }
+  .rmf-subtab:hover { color: var(--text); }
+  .rmf-subpanel { display: none; }
+  .rmf-subpanel.active { display: block; }
+  .rmf-input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; color: var(--text); font-size: 12px; outline: none; font-family: inherit;
+  }
+  textarea.rmf-input { width: 100%; resize: vertical; }
+  .rmf-matrix { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-width: 380px; margin-top: 10px; }
+  .rmf-cell {
+    aspect-ratio: 1; border-radius: 8px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-weight: 700; color: #0d1117;
+  }
+  .rmf-cell .n { font-size: 17px; }
+  .rmf-cell .b { font-size: 9px; text-transform: uppercase; letter-spacing: .03em; }
+  .rmf-band-low          { background: var(--green); }
+  .rmf-band-medium       { background: var(--yellow); }
+  .rmf-band-high         { background: var(--orange); }
+  .rmf-band-catastrophic { background: var(--red); }
+  .rmf-band-badge {
+    display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
+    border-radius: 20px; text-transform: uppercase; letter-spacing: .03em;
+  }
 
   /* Print styles */
   @media print {
@@ -696,6 +787,11 @@
     </div>
   </div>
 
+  <!-- Agent Passport modal -->
+  <div id="passport-overlay" onclick="if(event.target===this) closePassport()">
+    <div class="passport-card" id="passport-card"></div>
+  </div>
+
   <!-- Left: decision list -->
   <div id="list-panel">
     <div id="list-scroll">
@@ -731,6 +827,7 @@
           <button class="tab-btn" data-tab="exceptions">💬 Exceptions</button>
           <button class="tab-btn" data-tab="governance">🔗 Governance</button>
           <button class="tab-btn" data-tab="sdaia">🇸🇦 SDAIA</button>
+          <button class="tab-btn" data-tab="rmf">🎯 RMF (P145)</button>
         </div>
       </div>
 
@@ -977,9 +1074,157 @@
           <div class="card" id="sdaia-agents-card">
             <div class="card-title">🤖 Agents by SDAIA Risk</div>
             <table class="gov-table" id="sdaia-agents-table">
-              <thead><tr><th>Agent</th><th>Sector</th><th>Risk</th><th>Ethics Label</th><th>Open Incidents</th><th>Safety Reports</th></tr></thead>
+              <thead><tr><th>Agent</th><th>Sector</th><th>Risk</th><th>Ethics Label</th><th>Open Incidents</th><th>Safety Reports</th><th>Deployment Gate</th></tr></thead>
               <tbody></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SDAIA-P145 National AI Risk Management Framework -->
+      <div class="tab-panel" id="tab-rmf">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
+          Five-stage risk cycle · 4×4 matrix (likelihood × impact) · Standalone module — does not touch Responsible AI Policy (Mar 2026)
+        </div>
+        <div class="rmf-subtabs">
+          <button class="rmf-subtab active" data-rmf="overview">Overview</button>
+          <button class="rmf-subtab" data-rmf="register">Risk Register</button>
+          <button class="rmf-subtab" data-rmf="assess">Assess</button>
+          <button class="rmf-subtab" data-rmf="treat">Treat</button>
+          <button class="rmf-subtab" data-rmf="reviews">Reviews</button>
+          <button class="rmf-subtab" data-rmf="report">5-Stage Report</button>
+        </div>
+
+        <!-- OVERVIEW -->
+        <div class="rmf-subpanel active" id="rmf-overview">
+          <div class="gov-kpi-row" id="rmf-kpis"></div>
+          <div class="card">
+            <div class="card-title">4×4 Matrix — fleet risk distribution (latest assessment per risk)</div>
+            <div class="rmf-matrix" id="rmf-matrix"></div>
+          </div>
+        </div>
+
+        <!-- REGISTER -->
+        <div class="rmf-subpanel" id="rmf-register">
+          <div class="card">
+            <div class="card-title">Register Risk (Stage 2 — identification)</div>
+            <div style="display:grid;gap:10px">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input id="rmf-r-agent" class="rmf-input" placeholder="Agent ID (e.g. triage-agent-en)" style="flex:1;min-width:180px" />
+                <select id="rmf-r-cat" class="rmf-input" style="flex:1;min-width:220px">
+                  <option>bias_discrimination_abuse</option>
+                  <option>privacy_security</option>
+                  <option>misinformation</option>
+                  <option>malicious_use</option>
+                  <option>human_machine_interaction</option>
+                  <option>social_economic_environmental</option>
+                  <option>safety_limitations</option>
+                </select>
+              </div>
+              <textarea id="rmf-r-desc" class="rmf-input" placeholder="Description" style="min-height:60px"></textarea>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input id="rmf-r-source" class="rmf-input" placeholder="Source (internal / testing / third-party)" style="flex:1;min-width:150px" />
+                <input id="rmf-r-timing" class="rmf-input" placeholder="Timing (development / deployment / operation)" style="flex:1;min-width:150px" />
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input id="rmf-r-intent" class="rmf-input" placeholder="Intent (accidental / malicious)" style="flex:1;min-width:150px" />
+                <input id="rmf-r-by" class="rmf-input" placeholder="Identified by" style="flex:1;min-width:150px" />
+              </div>
+              <div><button class="btn" onclick="rmfRegisterRisk()">Register risk</button></div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:0">
+            <div class="card-title">Risk Register</div>
+            <table class="gov-table" id="rmf-risks-table">
+              <thead><tr><th>Agent</th><th>Category</th><th>Description</th><th>Status</th><th>Level</th><th>Band</th><th>Risk ID</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ASSESS -->
+        <div class="rmf-subpanel" id="rmf-assess">
+          <div class="card">
+            <div class="card-title">Assess Risk (Stage 3 → 4×4 matrix)</div>
+            <div style="display:grid;gap:10px">
+              <input id="rmf-a-risk" class="rmf-input" placeholder="Risk ID (copy from Risk Register)" />
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input id="rmf-a-lik" type="number" min="1" max="4" class="rmf-input" placeholder="Likelihood (1–4: rare…almost certain)" style="flex:1" />
+                <input id="rmf-a-imp" type="number" min="1" max="4" class="rmf-input" placeholder="Impact (1–4: low…catastrophic)" style="flex:1" />
+              </div>
+              <textarea id="rmf-a-ev" class="rmf-input" placeholder="Evidence" style="min-height:50px"></textarea>
+              <input id="rmf-a-by" class="rmf-input" placeholder="Assessed by" />
+              <div><button class="btn" onclick="rmfAssessRisk()">Assess risk</button></div>
+            </div>
+            <div id="rmf-assess-result" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <!-- TREAT -->
+        <div class="rmf-subpanel" id="rmf-treat">
+          <div class="card">
+            <div class="card-title">Record Treatment Decision (Stage 4)</div>
+            <div style="display:grid;gap:10px">
+              <input id="rmf-t-risk" class="rmf-input" placeholder="Risk ID" />
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <select id="rmf-t-strat" class="rmf-input" style="flex:1">
+                  <option value="avoid">avoid</option>
+                  <option value="mitigate">mitigate</option>
+                  <option value="transfer">transfer</option>
+                  <option value="accept">accept</option>
+                </select>
+                <input id="rmf-t-mech" class="rmf-input" placeholder="Approval mechanism (signature / workflow / sign-off)" style="flex:1;min-width:200px" />
+              </div>
+              <textarea id="rmf-t-rat" class="rmf-input" placeholder="Rationale — required, the documented justification" style="min-height:60px"></textarea>
+              <textarea id="rmf-t-ctrl" class="rmf-input" placeholder="Controls" style="min-height:50px"></textarea>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input id="rmf-t-rlik" type="number" min="1" max="4" class="rmf-input" placeholder="Residual likelihood (optional)" style="flex:1" />
+                <input id="rmf-t-rimp" type="number" min="1" max="4" class="rmf-input" placeholder="Residual impact (optional)" style="flex:1" />
+              </div>
+              <input id="rmf-t-appr" class="rmf-input" placeholder="Approver — required, who signed / approved" />
+              <div><button class="btn" onclick="rmfTreatRisk()">Record treatment</button></div>
+            </div>
+            <div id="rmf-treat-result" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <!-- REVIEWS -->
+        <div class="rmf-subpanel" id="rmf-reviews">
+          <div class="card">
+            <div class="card-title">Record Review (Stage 5 — monitoring &amp; review)</div>
+            <div style="display:grid;gap:10px">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input id="rmf-v-agent" class="rmf-input" placeholder="Agent ID" style="flex:1;min-width:180px" />
+                <select id="rmf-v-type" class="rmf-input" style="flex:1;min-width:150px">
+                  <option value="periodic">periodic</option>
+                  <option value="incident">incident</option>
+                  <option value="triggered">triggered</option>
+                </select>
+              </div>
+              <textarea id="rmf-v-find" class="rmf-input" placeholder="Findings" style="min-height:50px"></textarea>
+              <textarea id="rmf-v-rca" class="rmf-input" placeholder="Incident root-cause analysis" style="min-height:50px"></textarea>
+              <input id="rmf-v-by" class="rmf-input" placeholder="Reviewed by" />
+              <div><button class="btn" onclick="rmfRecordReview()">Record review</button></div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:0">
+            <div class="card-title">Reviews</div>
+            <table class="gov-table" id="rmf-reviews-table">
+              <thead><tr><th>Agent</th><th>Type</th><th>Findings</th><th>RCA</th><th>When</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- REPORT -->
+        <div class="rmf-subpanel" id="rmf-report">
+          <div class="card">
+            <div class="card-title">5-Stage Report</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input id="rmf-rp-agent" class="rmf-input" placeholder="Agent ID (e.g. triage-agent-en)" style="flex:1;min-width:220px" />
+              <button class="btn secondary" onclick="rmfGenerateReport()">Generate 5-stage report</button>
+            </div>
+            <div id="rmf-report-out" style="margin-top:12px"></div>
           </div>
         </div>
       </div>
@@ -995,6 +1240,7 @@ let searchTimeout = null;
 let complianceLoaded = false;
 let sdaiaLoaded = false;
 let agentsLoaded = false;
+let rmfLoaded = false;
 
 // ── Agent catalog ──────────────────────────────────────────────────────────
 
@@ -1098,7 +1344,341 @@ function renderAgentCard(a) {
         <div class="ac-stat-label">version</div>
       </div>
     </div>
+    <button class="ac-passport-btn" onclick="event.stopPropagation(); openPassport('${a.agent_name}')">🪪 View Passport</button>
   </div>`;
+}
+
+// ── Agent Passport ────────────────────────────────────────────────────────
+
+const PASSPORT_STATUS_STYLE = {
+  PROHIBITED: 'background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.4)',
+  BLOCKED:    'background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.4)',
+  WARNING:    'background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.4)',
+  UNVERIFIED: 'background:rgba(139,148,158,.15);color:var(--muted);border:1px solid var(--border)',
+  ACTIVE:     'background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.4)',
+};
+
+function passportEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+async function openPassport(agentName) {
+  const overlay = document.getElementById('passport-overlay');
+  const card = document.getElementById('passport-card');
+  card.innerHTML = '<div class="loading" style="padding:30px">Loading passport…</div>';
+  overlay.classList.add('active');
+  try {
+    const p = await apiFetch(`/api/v1/passport/${encodeURIComponent(agentName)}`);
+    card.innerHTML = renderPassport(p);
+  } catch (e) {
+    card.innerHTML = `<div class="loading" style="color:var(--red);padding:30px">Error: ${e.message}</div>`;
+  }
+}
+
+function closePassport() {
+  document.getElementById('passport-overlay').classList.remove('active');
+}
+
+function renderPassport(p) {
+  const id = p.identity;
+  const statusStyle = PASSPORT_STATUS_STYLE[p.revocation_status.status] || PASSPORT_STATUS_STYLE.UNVERIFIED;
+
+  const section = (label, bodyHtml) => `
+    <div class="passport-section">
+      <div class="passport-section-label">${label}</div>
+      <div class="passport-section-body">${bodyHtml}</div>
+    </div>`;
+
+  const untracked = note => `<span class="passport-untracked">${passportEsc(note)}</span>`;
+
+  const capabilitiesHtml = p.capabilities.length
+    ? `<div class="passport-tag-row">${p.capabilities.map(c => `<span class="passport-tag">${passportEsc(c.replace(/_/g, ' '))}</span>`).join('')}</div>`
+    : untracked('No intents declared');
+
+  const da = p.delegated_authority;
+  const authorityHtml = `<dl class="passport-kv">
+      <dt>Autonomy level</dt><dd>${da.autonomy_level ? passportEsc(da.autonomy_level) : untracked('not assessed')}</dd>
+      <dt>Handles PII</dt><dd>${da.contains_pii ? '⚠️ yes' : 'no'}</dd>
+      <dt>Data classification</dt><dd>${passportEsc(da.data_classification || 'internal')}</dd>
+    </dl>`;
+
+  const limits = p.spending_limits.extracted;
+  const limitsHtml = limits.length
+    ? `<div class="passport-tag-row">${limits.map(l => `<span class="passport-limit-tag">${passportEsc(l.key.replace(/_/g, ' '))}: ${passportEsc(l.value)}</span>`).join('')}</div>
+       <div style="font-size:10px;color:var(--muted);margin-top:6px">${passportEsc(p.spending_limits.note)}</div>`
+    : untracked('No numeric policy limits found in the behavioral contract');
+
+  const rep = p.reputation;
+  const reputationHtml = rep.tracked === false
+    ? untracked(rep.note)
+    : `<dl class="passport-kv">
+        <dt>Label</dt><dd>${passportEsc(rep.tier_name_ar)} (${passportEsc(rep.tier_name_en)})</dd>
+        <dt>Tier</dt><dd>${rep.tier} / 5</dd>
+        <dt>Score</dt><dd>${rep.score} / 100</dd>
+        <dt>Computed</dt><dd>${fmtTime(rep.computed_at)}</dd>
+      </dl>`;
+
+  const vh = p.verified_history;
+  const historyHtml = `<dl class="passport-kv">
+      <dt>Decisions logged</dt><dd>${vh.decision_count}</dd>
+      <dt>Avg. confidence</dt><dd>${vh.avg_confidence != null ? Math.round(vh.avg_confidence * 100) + '%' : '—'}</dd>
+      ${vh.incidents ? `
+      <dt>Incidents</dt><dd>${vh.incidents.total} total (${vh.incidents.open} open, ${vh.incidents.resolved} resolved)</dd>
+      <dt>Critical reported</dt><dd>${vh.incidents.critical_reported_to_regulator}</dd>` : ''}
+    </dl>${!vh.incidents ? `<div style="margin-top:6px">${untracked('No SDAIA incident record for this agent')}</div>` : ''}`;
+
+  const policyEntries = Object.entries(p.contracts.policies || {});
+  const contractsHtml = policyEntries.length
+    ? `<dl class="passport-kv">${policyEntries.map(([k, v]) => {
+        const vstr = typeof v === 'object' ? JSON.stringify(v) : String(v);
+        return `<dt title="${passportEsc(k)}">${passportEsc(k.replace(/_/g, ' '))}</dt><dd title="${passportEsc(vstr)}">${passportEsc(vstr.slice(0, 60))}</dd>`;
+      }).join('')}</dl>`
+    : untracked('No behavioral-contract policies declared');
+
+  const ev = p.evidence;
+  const evidenceHtml = `<dl class="passport-kv">
+      <dt>Safety reports on file</dt><dd>${ev.safety_report_count}</dd>
+      <dt>Latest safety report</dt><dd>${ev.latest_safety_report_at ? fmtTime(ev.latest_safety_report_at) : '—'}</dd>
+      <dt>Ghost Knowledge exceptions</dt><dd>${ev.exceptions_count}</dd>
+    </dl>`;
+
+  const risk = p.risk_score;
+  const riskHtml = risk.tracked === false
+    ? untracked(risk.note)
+    : `<div style="margin-bottom:6px"><b style="color:${SDAIA_LEVEL_COLOR[risk.overall] || 'var(--text)'}">${passportEsc(risk.overall)}</b> overall</div>
+       <div class="passport-tag-row">${risk.categories.map(c => `<span class="passport-tag" style="color:${SDAIA_LEVEL_COLOR[c.level] || 'var(--accent)'}" title="${passportEsc(c.rationale)}">${passportEsc(c.category.replace(/_/g, ' '))}: ${passportEsc(c.level)}</span>`).join('')}</div>`;
+
+  return `
+    <div class="passport-head">
+      <div>
+        <div class="passport-head-title">Agent Passport</div>
+        <div class="passport-head-name">${passportEsc(id.agent_name)}</div>
+        <div class="passport-head-sub">${passportEsc(id.model_id || 'unknown model')} · v${passportEsc(id.agent_version)} · ${passportEsc(id.agent_id)}</div>
+        <span class="passport-status-badge" style="${statusStyle}">${passportEsc(p.revocation_status.status)}</span>
+      </div>
+      <button class="passport-close" onclick="closePassport()">✕</button>
+    </div>
+    <div class="passport-body">
+      ${section('Identity', `${passportEsc(id.description || 'No description')}<div style="margin-top:6px;font-size:11px;color:var(--muted)">Registered ${fmtTime(id.registered_at)} · last seen ${fmtTime(id.last_seen)}</div>`)}
+      ${section('Owner', untracked(p.owner.note))}
+      ${section('Organization', p.organization ? `<span class="group-pill">${passportEsc(p.organization)}</span>` : untracked('No organization/group set'))}
+      ${section('Capabilities', capabilitiesHtml)}
+      ${section('Delegated Authority', authorityHtml)}
+      ${section('Spending Limits', limitsHtml)}
+      ${section('Reputation', reputationHtml)}
+      ${section('Verified History', historyHtml)}
+      ${section('Contracts', contractsHtml)}
+      ${section('Evidence', evidenceHtml)}
+      ${section('Risk Score', riskHtml)}
+      ${section('Revocation Status', `<b>${passportEsc(p.revocation_status.status)}</b> — ${passportEsc(p.revocation_status.reason)}`)}
+    </div>`;
+}
+
+// ── RMF (P145) — SDAIA National AI Risk Management Framework ───────────────
+
+function rmfEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function rmfBandBadge(band) {
+  if (!band) return '—';
+  return `<span class="rmf-band-badge rmf-band-${band}" style="color:#0d1117">${rmfEsc(band)}</span>`;
+}
+
+document.querySelectorAll('.rmf-subtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.rmf-subtab').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.rmf-subpanel').forEach(p => p.classList.toggle('active', p.id === `rmf-${btn.dataset.rmf}`));
+  });
+});
+
+async function loadRmfDashboard() {
+  rmfLoaded = true;
+  await Promise.all([rmfLoadOverview(), rmfLoadRisks(), rmfLoadReviews()]);
+}
+
+async function rmfLoadOverview() {
+  try {
+    const [matrix, risks, reviews] = await Promise.all([
+      apiFetch('/api/v1/rmf/matrix'),
+      apiFetch('/api/v1/rmf/risks'),
+      apiFetch('/api/v1/rmf/reviews'),
+    ]);
+    const assessed = risks.filter(r => r.assessment).length;
+    const treated = risks.filter(r => r.treatment).length;
+    const accepted = risks.filter(r => r.treatment && r.treatment.strategy === 'accept').length;
+    document.getElementById('rmf-kpis').innerHTML = [
+      { val: risks.length, lbl: 'Risks Identified', color: 'var(--accent)' },
+      { val: assessed, lbl: 'Assessed (4×4)', color: 'var(--purple)' },
+      { val: treated, lbl: 'Treated', color: 'var(--green)' },
+      { val: accepted, lbl: 'Accepted (Documented)', color: 'var(--yellow)' },
+      { val: reviews.length, lbl: 'Reviews', color: 'var(--text)' },
+    ].map(k => `
+      <div class="gov-kpi">
+        <div class="gkv" style="color:${k.color}">${k.val}</div>
+        <div class="gkl">${k.lbl}</div>
+      </div>
+    `).join('');
+
+    const cells = [];
+    for (let lik = 1; lik <= 4; lik++) for (let imp = 1; imp <= 4; imp++) cells.push([lik, imp]);
+    document.getElementById('rmf-matrix').innerHTML = cells.map(([lik, imp]) => {
+      const level = lik * imp;
+      const band = level <= 2 ? 'low' : level <= 6 ? 'medium' : level <= 12 ? 'high' : 'catastrophic';
+      return `<div class="rmf-cell rmf-band-${band}" title="likelihood ${lik} × impact ${imp}"><span class="n">${level}</span><span class="b">${band}</span></div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('rmf-kpis').innerHTML = `<div class="loading" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+async function rmfLoadRisks() {
+  try {
+    const risks = await apiFetch('/api/v1/rmf/risks');
+    const body = document.querySelector('#rmf-risks-table tbody');
+    if (!risks.length) {
+      body.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:16px">No risks registered yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = risks.map(r => `
+      <tr>
+        <td style="color:var(--purple)">${rmfEsc(r.agent_id)}</td>
+        <td>${rmfEsc(r.category.replace(/_/g, ' '))}</td>
+        <td>${rmfEsc((r.description || '').slice(0, 60))}${(r.description || '').length > 60 ? '…' : ''}</td>
+        <td>${rmfEsc(r.status)}</td>
+        <td>${r.assessment ? r.assessment.risk_level : '—'}</td>
+        <td>${r.assessment ? rmfBandBadge(r.assessment.band) : '—'}</td>
+        <td style="color:var(--muted);font-size:10px" title="${rmfEsc(r.risk_id)}">${rmfEsc(r.risk_id.slice(0, 8))}…</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    document.querySelector('#rmf-risks-table tbody').innerHTML =
+      `<tr><td colspan="7" style="color:var(--red)">Error: ${rmfEsc(e.message)}</td></tr>`;
+  }
+}
+
+async function rmfLoadReviews() {
+  try {
+    const reviews = await apiFetch('/api/v1/rmf/reviews');
+    const body = document.querySelector('#rmf-reviews-table tbody');
+    if (!reviews.length) {
+      body.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">No reviews recorded yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = reviews.map(r => `
+      <tr>
+        <td style="color:var(--purple)">${rmfEsc(r.agent_id)}</td>
+        <td>${rmfEsc(r.review_type)}</td>
+        <td>${rmfEsc((r.findings || '').slice(0, 60))}</td>
+        <td>${rmfEsc((r.incident_rca || '').slice(0, 60))}</td>
+        <td style="color:var(--muted)">${fmtTime(r.created_at)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    document.querySelector('#rmf-reviews-table tbody').innerHTML =
+      `<tr><td colspan="5" style="color:var(--red)">Error: ${rmfEsc(e.message)}</td></tr>`;
+  }
+}
+
+async function rmfPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+}
+
+async function rmfRegisterRisk() {
+  const agentId = document.getElementById('rmf-r-agent').value.trim();
+  const description = document.getElementById('rmf-r-desc').value.trim();
+  if (!agentId || !description) { alert('Agent ID and description are required.'); return; }
+  try {
+    await rmfPost('/api/v1/rmf/risks', {
+      agent_id: agentId,
+      category: document.getElementById('rmf-r-cat').value,
+      description,
+      source: document.getElementById('rmf-r-source').value,
+      timing: document.getElementById('rmf-r-timing').value,
+      intent: document.getElementById('rmf-r-intent').value,
+      identified_by: document.getElementById('rmf-r-by').value,
+    });
+    document.getElementById('rmf-r-desc').value = '';
+    rmfLoadRisks(); rmfLoadOverview();
+  } catch (e) { alert(`Error: ${e.message}`); }
+}
+
+async function rmfAssessRisk() {
+  const riskId = document.getElementById('rmf-a-risk').value.trim();
+  const lik = +document.getElementById('rmf-a-lik').value;
+  const imp = +document.getElementById('rmf-a-imp').value;
+  if (!riskId || !lik || !imp) { alert('Risk ID, likelihood, and impact are required.'); return; }
+  try {
+    const r = await rmfPost(`/api/v1/rmf/risks/${encodeURIComponent(riskId)}/assess`, {
+      likelihood: lik, impact: imp,
+      evidence: document.getElementById('rmf-a-ev').value,
+      assessed_by: document.getElementById('rmf-a-by').value,
+    });
+    document.getElementById('rmf-assess-result').innerHTML =
+      `<div class="card">Level <b>${r.risk_level}</b> → ${rmfBandBadge(r.band)} (likelihood ${r.likelihood} × impact ${r.impact})</div>`;
+    rmfLoadRisks(); rmfLoadOverview();
+  } catch (e) { alert(`Error: ${e.message}`); }
+}
+
+async function rmfTreatRisk() {
+  const riskId = document.getElementById('rmf-t-risk').value.trim();
+  const rationale = document.getElementById('rmf-t-rat').value.trim();
+  const approver = document.getElementById('rmf-t-appr').value.trim();
+  if (!riskId || !rationale || !approver) { alert('Risk ID, rationale, and approver are required.'); return; }
+  const body = {
+    strategy: document.getElementById('rmf-t-strat').value,
+    rationale, approver,
+    controls: document.getElementById('rmf-t-ctrl').value,
+    approval_mechanism: document.getElementById('rmf-t-mech').value,
+  };
+  const rlik = document.getElementById('rmf-t-rlik').value;
+  const rimp = document.getElementById('rmf-t-rimp').value;
+  if (rlik) body.residual_likelihood = +rlik;
+  if (rimp) body.residual_impact = +rimp;
+  try {
+    const r = await rmfPost(`/api/v1/rmf/risks/${encodeURIComponent(riskId)}/treat`, body);
+    document.getElementById('rmf-treat-result').innerHTML =
+      `<div class="card">Strategy <b>${rmfEsc(r.strategy)}</b> · approver <b>${rmfEsc(r.approver)}</b> · residual level ${r.residual_level ?? 'n/a'}</div>`;
+    rmfLoadRisks(); rmfLoadOverview();
+  } catch (e) { alert(`Error: ${e.message}`); }
+}
+
+async function rmfRecordReview() {
+  const agentId = document.getElementById('rmf-v-agent').value.trim();
+  if (!agentId) { alert('Agent ID is required.'); return; }
+  try {
+    await rmfPost('/api/v1/rmf/reviews', {
+      agent_id: agentId,
+      review_type: document.getElementById('rmf-v-type').value,
+      findings: document.getElementById('rmf-v-find').value,
+      incident_rca: document.getElementById('rmf-v-rca').value,
+      reviewed_by: document.getElementById('rmf-v-by').value,
+    });
+    document.getElementById('rmf-v-find').value = '';
+    document.getElementById('rmf-v-rca').value = '';
+    rmfLoadReviews(); rmfLoadOverview();
+  } catch (e) { alert(`Error: ${e.message}`); }
+}
+
+async function rmfGenerateReport() {
+  const agentId = document.getElementById('rmf-rp-agent').value.trim();
+  if (!agentId) { alert('Agent ID is required.'); return; }
+  try {
+    const r = await apiFetch(`/api/v1/rmf/report/${encodeURIComponent(agentId)}`);
+    document.getElementById('rmf-report-out').innerHTML =
+      `<div class="card"><div class="lbl" style="color:var(--muted);font-size:11px;margin-bottom:8px">Stages evidenced: ${r.stages_evidenced}/5</div>
+       <pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;overflow-x:auto;white-space:pre-wrap">${rmfEsc(JSON.stringify(r, null, 2))}</pre></div>`;
+  } catch (e) { alert(`Error: ${e.message}`); }
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
@@ -1598,9 +2178,15 @@ function renderGovernance(data) {
 
 // ── SDAIA Compliance ────────────────────────────────────────────────────────
 
+// Keys match app/sdaia_api.py's _LEVEL_RANK — SDAIA Responsible AI Policy §7.2.
 const SDAIA_LEVEL_COLOR = {
   CRITICAL: 'var(--red)', HIGH: 'var(--yellow)',
-  MEDIUM: 'var(--accent)', LOW: 'var(--green)',
+  LIMITED: 'var(--accent)', MINIMAL: 'var(--green)',
+};
+
+const SDAIA_GATE_COLOR = {
+  prohibited: 'var(--red)', blocked: 'var(--red)',
+  warning: 'var(--yellow)', approved: 'var(--green)',
 };
 
 function sdaiaEsc(s) {
@@ -1625,7 +2211,17 @@ async function loadSdaiaDashboard() {
       apiFetch('/api/v1/sdaia/agents'),
       apiFetch(`/api/v1/sdaia/incidents?${params}`),
     ]);
-    renderSdaia(overview, agents, incidents);
+    // Deployment-gate decision (SDAIA policy §7.8 critical-risk ban,
+    // §7.2.2/§7.2.3 minimum ethics-label-per-risk-level) isn't derivable
+    // from the agents list alone — fetch it per agent so the dashboard
+    // shows the same enforcement the API actually applies.
+    const gates = await Promise.all(
+      agents.map(a =>
+        apiFetch(`/api/v1/sdaia/agents/${encodeURIComponent(a.agent_id)}/deployment-check`)
+          .catch(() => null)
+      )
+    );
+    renderSdaia(overview, agents, incidents, gates);
     sdaiaLoaded = true;
   } catch (e) {
     document.getElementById('sdaia-loading').textContent = `Error: ${e.message}`;
@@ -1633,7 +2229,7 @@ async function loadSdaiaDashboard() {
   }
 }
 
-function renderSdaia(overview, agents, incidents) {
+function renderSdaia(overview, agents, incidents, gates) {
   document.getElementById('sdaia-loading').style.display = 'none';
   document.getElementById('sdaia-content').style.display = '';
 
@@ -1670,9 +2266,13 @@ function renderSdaia(overview, agents, incidents) {
 
   const agBody = document.querySelector('#sdaia-agents-table tbody');
   if (!agents.length) {
-    agBody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:16px">No agents registered yet.</td></tr>';
+    agBody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:16px">No agents registered yet.</td></tr>';
   } else {
-    agBody.innerHTML = agents.map(a => `
+    agBody.innerHTML = agents.map((a, idx) => {
+      const gate = gates?.[idx];
+      const gateLabel = gate ? gate.decision : '—';
+      const gateTitle = gate ? sdaiaEsc(gate.reason) : '';
+      return `
       <tr>
         <td style="color:var(--purple)">${sdaiaEsc(a.name)}</td>
         <td>${sdaiaEsc(a.sector)}</td>
@@ -1680,8 +2280,10 @@ function renderSdaia(overview, agents, incidents) {
         <td>${a.ethics_label_en ? `${sdaiaEsc(a.ethics_label_ar)} (${sdaiaEsc(a.ethics_label_en)})` : '—'}</td>
         <td style="color:${a.open_incidents > 0 ? 'var(--red)' : 'var(--muted)'}">${a.open_incidents}</td>
         <td>${a.safety_report_count}</td>
+        <td style="color:${SDAIA_GATE_COLOR[gateLabel] || 'var(--muted)'}" title="${gateTitle}">${sdaiaEsc(gateLabel)}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
 }
 
@@ -1917,6 +2519,7 @@ function switchTab(name) {
   if (name === 'exceptions')  loadExceptions();
   if (name === 'governance')  loadGovernance();
   if (name === 'sdaia' && !sdaiaLoaded) loadSdaiaDashboard();
+  if (name === 'rmf' && !rmfLoaded) loadRmfDashboard();
 }
 
 // Open compliance tab from badge

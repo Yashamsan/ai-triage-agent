@@ -17,8 +17,10 @@ from pydantic import BaseModel
 
 from app.agent_graph import triage_agent
 from app.multi_agent_routes import router as multi_agent_router
+from app.passport_api import router as passport_router
 from app.prooflayer_api import router as prooflayer_router
 from app.prooflayer_graph import record_decision
+from app.rmf_api import router as rmf_router
 from app.sdaia_api import router as sdaia_router
 from app.security.guard_classifier import guard_classify
 from app.security.input_sanitizer import InputSanitizer
@@ -33,6 +35,8 @@ app = FastAPI(title="AI Triage Agent")
 app.include_router(prooflayer_router)
 app.include_router(multi_agent_router)
 app.include_router(sdaia_router)
+app.include_router(passport_router)
+app.include_router(rmf_router)
 
 try:
     # Additive, demo-scoped durable-execution path (POST /triage/durable) —
@@ -47,7 +51,12 @@ except Exception as exc:
 
 @app.on_event("startup")
 def _startup() -> None:
-    from app.database import apply_schema_v2, apply_schema_v3
+    from app.database import apply_schema, apply_schema_rmf, apply_schema_v2, apply_schema_v3
+    try:
+        apply_schema()
+        print("[startup] schema (knowledge_base_chunks search_vector) applied")
+    except Exception as exc:
+        print(f"[startup] schema migration skipped: {exc}")
     try:
         apply_schema_v2()
     except Exception as exc:
@@ -57,6 +66,11 @@ def _startup() -> None:
         print("[startup] schema_v3 applied")
     except Exception as exc:
         print(f"[startup] schema_v3 migration skipped: {exc}")
+    try:
+        apply_schema_rmf()
+        print("[startup] schema_rmf (P145) applied")
+    except Exception as exc:
+        print(f"[startup] schema_rmf migration skipped: {exc}")
     try:
         from app.embeddings import embed
         embed("warmup")
@@ -146,10 +160,10 @@ async def triage(request: TriageRequest, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=422, detail="message cannot be empty")
 
     if _resolve_language(request.session_id, request.message) == "ar":
-        result = await _triage_ar(request)
+        result, trace_steps = await _triage_ar(request)
         agent_name = "triage-agent-ar"
     else:
-        result = await _triage_en(request)
+        result, trace_steps = await _triage_en(request)
         agent_name = "triage-agent-en"
 
     background_tasks.add_task(
@@ -162,12 +176,13 @@ async def triage(request: TriageRequest, background_tasks: BackgroundTasks):
         model_id="deepseek/deepseek-chat",
         reasoning_summary="pending-escalation" if result.interrupted else result.response[:500],
         human_override=False,
+        trace_steps=trace_steps,
     )
 
     return result
 
 
-async def _triage_en(request: TriageRequest) -> TriageResponse:
+async def _triage_en(request: TriageRequest) -> tuple[TriageResponse, list[dict]]:
     sanitized = sanitizer.sanitize(request.message)
     if sanitized.blocked:
         raise HTTPException(status_code=422, detail=f"Message rejected: {sanitized.block_reason}")
@@ -201,6 +216,7 @@ async def _triage_en(request: TriageRequest) -> TriageResponse:
                 "context_history": "",
                 "precedent_context": "",
                 "response_text": "",
+                "trace_steps": [],
             },
             config=config,
         )
@@ -219,9 +235,10 @@ async def _triage_en(request: TriageRequest) -> TriageResponse:
             needs_escalation=True,
             interrupted=True,
             thread_id=thread_id,
-        )
+        ), partial.get("trace_steps", [])
 
     final_state = snapshot.values
+    trace_steps = final_state.get("trace_steps", [])
     pii_result = output_filter.filter_pii(final_state["response_text"])
     triage_response = TriageResponse(
         intent=final_state["intent"],
@@ -235,11 +252,11 @@ async def _triage_en(request: TriageRequest) -> TriageResponse:
             response="We're experiencing a technical issue. Please try again later.",
             confidence=0.0,
             needs_escalation=False,
-        )
-    return triage_response
+        ), trace_steps
+    return triage_response, trace_steps
 
 
-async def _triage_ar(request: TriageRequest) -> TriageResponse:
+async def _triage_ar(request: TriageRequest) -> tuple[TriageResponse, list[dict]]:
     sanitized = ar_sanitizer.sanitize(request.message)
     if sanitized.blocked:
         raise HTTPException(status_code=422, detail=f"تم رفض الرسالة: {sanitized.block_reason}")
@@ -275,12 +292,29 @@ async def _triage_ar(request: TriageRequest) -> TriageResponse:
                 "context_history": "",
                 "precedent_context": "",
                 "response_text": "",
+                "trace_steps": [],
             },
             config=config,
         )
 
     snapshot = triage_agent_ar.get_state(config)
+    if snapshot.next:
+        partial = snapshot.values
+        return TriageResponse(
+            intent=partial.get("intent", "escalation"),
+            response=(
+                "⏸ **بانتظار موافقة المشرف**\n\n"
+                "يتطلب هذا الطلب مراجعة من وكيل أول قبل إنشاء التذكرة. "
+                f"استخدم `POST /triage/resume` مع `thread_id={thread_id!r}` للموافقة أو الرفض."
+            ),
+            confidence=partial.get("confidence", 0.0),
+            needs_escalation=True,
+            interrupted=True,
+            thread_id=thread_id,
+        ), partial.get("trace_steps", [])
+
     final_state = snapshot.values
+    trace_steps = final_state.get("trace_steps", [])
     pii_result = ar_output_filter.filter_pii(final_state["response_text"])
     triage_response = TriageResponse(
         intent=final_state["intent"],
@@ -294,21 +328,23 @@ async def _triage_ar(request: TriageRequest) -> TriageResponse:
             response="نواجه مشكلة تقنية حالياً. الرجاء المحاولة لاحقاً.",
             confidence=0.0,
             needs_escalation=False,
-        )
-    return triage_response
+        ), trace_steps
+    return triage_response, trace_steps
 
 
 @app.post("/triage/resume", response_model=TriageResponse)
 @observe(name="triage-resume")
-async def triage_resume(request: ResumeRequest):
+async def triage_resume(request: ResumeRequest, background_tasks: BackgroundTasks):
     config = {"configurable": {"thread_id": request.thread_id}}
 
     if request.thread_id.startswith("ar_"):
         agent = triage_agent_ar
         pii = ar_output_filter
+        agent_name = "triage-agent-ar"
     else:
         agent = triage_agent
         pii = output_filter
+        agent_name = "triage-agent-en"
 
     snapshot = agent.get_state(config)
     if not snapshot or not snapshot.next:
@@ -316,6 +352,26 @@ async def triage_resume(request: ResumeRequest):
 
     final_state = await agent.ainvoke(Command(resume=request.approved), config=config)
     pii_result = pii.filter_pii(final_state["response_text"])
+
+    # A human is the one deciding here (approve/decline the escalation) — this
+    # is the actual human-in-the-loop intervention point, so record it as
+    # such rather than letting it go unlogged like the rest of the pipeline.
+    background_tasks.add_task(
+        record_decision,
+        decision_value=final_state["intent"],
+        confidence=final_state["confidence"],
+        input_query=final_state.get("message", ""),
+        session_id=request.thread_id,
+        agent_name=agent_name,
+        model_id="deepseek/deepseek-chat",
+        reasoning_summary=(
+            f"Human {'approved' if request.approved else 'declined'} escalation. "
+            + pii_result.filtered_text[:400]
+        ),
+        human_override=True,
+        trace_steps=final_state.get("trace_steps", []),
+    )
+
     return TriageResponse(
         intent=final_state["intent"],
         response=pii_result.filtered_text,

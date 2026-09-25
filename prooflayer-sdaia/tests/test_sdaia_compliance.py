@@ -14,11 +14,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from app.sdaia_storage import SDAIAStorage
-from app.sdaia_risk import classify_agent, assess_and_store, assess_agent_risk, RISK_CATEGORIES
 from app import incidents as incidents_mod
-from app.safety_reports import generate_safety_report, SAFETY_REPORT_ITEMS
-from app.sdaia_labels import compute_ethics_label, TIERS
+from app.safety_reports import SAFETY_REPORT_ITEMS, generate_safety_report
+from app.sdaia_labels import TIERS, compute_ethics_label
+from app.sdaia_risk import RISK_CATEGORIES, assess_agent_risk, assess_and_store, classify_agent
+from app.sdaia_storage import SDAIAStorage
 
 
 def _new_storage() -> SDAIAStorage:
@@ -54,12 +54,12 @@ def test_get_agent_not_found():
     assert storage.get_agent("does_not_exist") is None
 
 
-def test_risk_classify_low():
+def test_risk_classify_minimal():
     result = classify_agent(
         {"sector": "retail", "handles_pii": False, "autonomy_level": "assisted",
          "affected_population": "individual"}
     )
-    assert result["overall"] == "LOW", result["overall"]
+    assert result["overall"] == "MINIMAL", result["overall"]
 
 
 def test_risk_classify_critical_telecom_pii():
@@ -76,8 +76,8 @@ def test_risk_overall_is_max_of_categories():
          "affected_population": "public"}
     )
     levels = [c["level"] for c in result["categories"].values()]
-    rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
-    assert result["overall"] == max(levels, key=lambda l: rank[l])
+    rank = {"MINIMAL": 0, "LIMITED": 1, "HIGH": 2, "CRITICAL": 3}
+    assert result["overall"] == max(levels, key=lambda lvl: rank[lvl])
 
 
 def test_seven_categories_assessed():
@@ -99,13 +99,13 @@ def test_log_decision():
     assert decisions[0]["requires_human_review"] == 1
 
 
-def test_log_incident_medium():
+def test_log_incident_limited():
     storage = _new_storage()
     storage.register_agent("agent_3", "Agent Three", "retail")
     incident = incidents_mod.log_incident(
-        storage, "agent_3", "MEDIUM", "financial", "Minor calculation error"
+        storage, "agent_3", "LIMITED", "economic", "Minor calculation error"
     )
-    assert incident["severity"] == "MEDIUM"
+    assert incident["severity"] == "LIMITED"
     assert incident["reported_to_regulator"] == 0
 
 
@@ -123,7 +123,7 @@ def test_log_incident_critical_auto_reports():
 def test_resolve_incident():
     storage = _new_storage()
     storage.register_agent("agent_5", "Agent Five", "retail")
-    incident = incidents_mod.log_incident(storage, "agent_5", "LOW", "safety", "Minor glitch")
+    incident = incidents_mod.log_incident(storage, "agent_5", "MINIMAL", "technical", "Minor glitch")
     resolved = incidents_mod.resolve_incident(
         storage, incident["id"], "Config drift", "Reverted config"
     )
@@ -135,8 +135,8 @@ def test_list_incidents_by_agent():
     storage = _new_storage()
     storage.register_agent("agent_6", "Agent Six", "retail")
     storage.register_agent("agent_7", "Agent Seven", "retail")
-    incidents_mod.log_incident(storage, "agent_6", "LOW", "safety", "Issue A")
-    incidents_mod.log_incident(storage, "agent_7", "LOW", "safety", "Issue B")
+    incidents_mod.log_incident(storage, "agent_6", "MINIMAL", "technical", "Issue A")
+    incidents_mod.log_incident(storage, "agent_7", "MINIMAL", "technical", "Issue B")
     agent_6_incidents = storage.list_incidents(agent_id="agent_6")
     assert len(agent_6_incidents) == 1
     assert agent_6_incidents[0]["description"] == "Issue A"
@@ -161,7 +161,7 @@ def test_ethics_label_tiers_ordered():
     assert tier_numbers == sorted(tier_numbers)
 
 
-def test_compute_ethics_label_committed():
+def test_compute_ethics_label_trusted():
     storage = _new_storage()
     agent_id = "agent_9"
     storage.register_agent(agent_id, "Agent Nine", "telecom", handles_pii=True,
@@ -179,8 +179,8 @@ def test_compute_ethics_label_committed():
     )
     generate_safety_report(storage, agent_id)
     label = compute_ethics_label(storage, agent_id)
-    assert label["tier_name_en"] == "Committed", label
-    assert label["tier_name_ar"] == "ملتزم"
+    assert label["tier_name_en"] == "Trusted", label
+    assert label["tier_name_ar"] == "موثوق"
     assert 75 <= label["score"] <= 89
 
 
@@ -200,8 +200,8 @@ def test_end_to_end_demo_flow():
                               requires_human_review=(i % 4 == 0))
     assert len(storage.list_decisions(agent_id)) == 12
 
-    med = incidents_mod.log_incident(storage, agent_id, "MEDIUM", "financial", "Rounding error")
-    incidents_mod.resolve_incident(storage, med["id"], "Rounding order", "Fixed order")
+    lim = incidents_mod.log_incident(storage, agent_id, "LIMITED", "economic", "Rounding error")
+    incidents_mod.resolve_incident(storage, lim["id"], "Rounding order", "Fixed order")
     crit = incidents_mod.log_incident(storage, agent_id, "CRITICAL", "legal", "Limit exceeded")
     incidents_mod.resolve_incident(storage, crit["id"], "Bad config", "Config fixed")
     assert len(storage.list_incidents(agent_id=agent_id)) == 2
@@ -241,7 +241,7 @@ def test_assess_agent_risk_oversight_deescalates():
         storage, "agent_12", sector="telecom", has_pii=True,
         is_autonomous=True, has_human_oversight=True,
     )
-    rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    rank = {"MINIMAL": 0, "LIMITED": 1, "HIGH": 2, "CRITICAL": 3}
     assert rank[with_oversight["overall"]] < rank[without_oversight["overall"]]
 
 
@@ -264,8 +264,8 @@ def test_safety_report_period_days_filters_old_records():
         "affected_population": "public",
     })
 
-    recent = incidents_mod.log_incident(storage, agent_id, "MEDIUM", "financial", "Recent issue")
-    stale = incidents_mod.log_incident(storage, agent_id, "MEDIUM", "financial", "Old issue")
+    incidents_mod.log_incident(storage, agent_id, "LIMITED", "economic", "Recent issue")
+    stale = incidents_mod.log_incident(storage, agent_id, "LIMITED", "economic", "Old issue")
     # Backdate the "stale" incident's detected_at well outside a 90-day window.
     storage.conn.execute(
         "UPDATE incidents SET detected_at = ? WHERE id = ?",
@@ -274,11 +274,11 @@ def test_safety_report_period_days_filters_old_records():
     storage.conn.commit()
 
     full_report = generate_safety_report(storage, agent_id)
-    assert full_report["incident_history_and_remediation"]["total_incidents"] == 2
+    assert full_report["misuse_and_adversarial_scenario_results"]["incidents_on_record"] == 2
 
     windowed_report = generate_safety_report(storage, agent_id, period_days=90)
-    assert windowed_report["incident_history_and_remediation"]["total_incidents"] == 1
-    assert windowed_report["system_description"]["report_period_days"] == 90
+    assert windowed_report["misuse_and_adversarial_scenario_results"]["incidents_on_record"] == 1
+    assert windowed_report["periodic_report_updates"]["report_period_days"] == 90
 
 
 TESTS = [

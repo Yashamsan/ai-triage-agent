@@ -1,22 +1,33 @@
-"""Ethics label system for the SDAIA compliance module (illustrative scaffold).
+"""Ethics label system for the SDAIA compliance module.
 
-Five governance-maturity tiers, scored from an agent's safety report and
-incident-handling history. Inherent risk level (from sdaia_risk.py) is
-tracked separately from this label: a CRITICAL-risk agent can still earn
-a high label if it is well-governed (incidents resolved and reported,
-human oversight in place, safety report complete).
+Scores an agent's safety report + incident-handling history against the 5
+tiers defined by the SDAIA "Responsible AI Policy" §6.8 (وسم أخلاقيات
+الذكاء الاصطناعي): واعٍ (Aware) -> متبنٍ (Adopting) -> ملتزم (Committed) ->
+موثوق (Trusted) -> رائد (Leading). §7.2.2/§7.2.3 tie minimum required
+tiers to risk level (High risk -> Trusted minimum, Limited risk ->
+Committed minimum) — see app/sdaia_api.py's deployment-check for that
+enforcement.
 
-Tier names/thresholds are an illustrative scoring scheme, not a verified
-transcription of a specific SDAIA document section.
+Inherent risk level (from sdaia_risk.py) is tracked separately from this
+label: a CRITICAL-risk agent can still earn a high label if it is
+well-governed (incidents resolved and reported, human oversight in place,
+safety report complete) — though §7.8 bans launching it regardless.
+
+The point *thresholds* below (which score lands in which tier) are this
+project's own scoring model — the policy defines the 5 tier names, not a
+specific scoring algorithm — so calibrate to your own compliance mapping
+before relying on this for real regulatory decisions. This must stay in
+sync with the ETHICS_LABELS_EN/AR vocabulary in app/sdaia_api.py, which
+writes to the same ethics_labels table.
 """
 from __future__ import annotations
 
 TIERS = [
-    (1, "غير ملتزم", "Non-Compliant"),
-    (2, "تحت المراقبة", "Under Monitoring"),
-    (3, "متوافق جزئياً", "Partially Compliant"),
-    (4, "ملتزم", "Committed"),
-    (5, "متميز", "Exemplary"),
+    (1, "واعٍ", "Aware"),
+    (2, "متبنٍ", "Adopting"),
+    (3, "ملتزم", "Committed"),
+    (4, "موثوق", "Trusted"),
+    (5, "رائد", "Leading"),
 ]
 
 

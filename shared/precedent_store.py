@@ -6,21 +6,13 @@ import os
 
 import psycopg2
 from pgvector.psycopg2 import register_vector
-from sentence_transformers import SentenceTransformer
+
+from shared.embeddings import embed
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@localhost/triage_agent",
 )
-
-_model: SentenceTransformer | None = None
-
-
-def _get_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
 
 
 def _get_conn():
@@ -41,7 +33,7 @@ def store_trace(trace: dict, human_correction: str | None = None):
 
     query_text = trace.get("query", "")
     text_for_embedding = query_text.strip() or trace.get("symptoms", "")
-    embedding = _get_model().encode(text_for_embedding)
+    embedding = embed(text_for_embedding)
 
     pattern_hash = compute_pattern_hash(query_text)
 
@@ -57,7 +49,7 @@ def store_trace(trace: dict, human_correction: str | None = None):
         human_correction or trace.get("human_correction"),
         trace.get("correction_reason"),
         json.dumps(trace),
-        embedding.tolist(),
+        embedding,
     ))
     conn.commit()
     cur.close()
@@ -75,7 +67,7 @@ def find_precedent(
     cur = conn.cursor()
 
     text = f"{symptoms} {vitals} {past_history}".strip()
-    embedding = _get_model().encode(text)
+    embedding = embed(text)
 
     cur.execute("""
         SELECT pattern_hash, intent, severity_decision,
@@ -86,7 +78,7 @@ def find_precedent(
         WHERE 1 - (embedding <=> %s::vector) > 0.7
         ORDER BY similarity DESC
         LIMIT %s
-    """, (embedding.tolist(), embedding.tolist(), top_k))
+    """, (embedding, embedding, top_k))
 
     rows = cur.fetchall()
     cur.close()

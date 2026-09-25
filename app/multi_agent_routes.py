@@ -175,8 +175,12 @@ def triage_multi(request: MultiTriageRequest) -> MultiTriageResponse:
     agent_obj   = agents_map.get(agent_name)
     agent_group = agent_obj.group if agent_obj else ""
 
-    # Prefer agent-level confidence; fall back to router classification confidence
-    confidence       = float(result.get("agent_confidence") or result.get("confidence", 0.0))
+    # Prefer agent-level confidence; fall back to router classification confidence.
+    # Must check "is not None", not truthiness -- 0.0 is router.py's deliberate
+    # signal for a dispatch failure/escalation and must not be masked by a
+    # fallback to the (possibly high) router classification confidence.
+    agent_confidence = result.get("agent_confidence")
+    confidence = float(agent_confidence if agent_confidence is not None else result.get("confidence", 0.0))
     needs_escalation = bool(result.get("needs_escalation", False))
 
     # ── Phase 4: PII output filter ────────────────────────────────────────

@@ -1,31 +1,38 @@
-"""SDAIA-style risk classification engine (illustrative scaffold).
+"""SDAIA risk classification engine.
 
-Assesses an agent across 7 risk categories and derives an overall level.
-This is a heuristic governance model, not a certified regulatory scoring
-system — calibrate the thresholds/weights to your own compliance mapping
-before relying on it for real decisions.
+Assesses an agent across the 7 risk-impact categories defined in the SDAIA
+"Responsible AI Policy" (سياسة الذكاء الاصطناعي المسؤول, public-consultation
+draft, March 2026) §7.3, and derives an overall level using the 4-tier scale
+from §7.2.1-7.2.4. The category-classification heuristic below (which
+factors push a category up a level) is this project's own scoring model —
+the policy defines the categories and levels, not a specific algorithm —
+so calibrate the thresholds/weights to your own compliance mapping before
+relying on this for real regulatory decisions.
 """
 from __future__ import annotations
 
 from typing import Any
 
+# §7.3.1-7.3.7 — the policy's own 7 risk-impact categories, in document order.
 RISK_CATEGORIES = [
-    "political",
-    "religious",
-    "financial",
-    "health",
-    "safety",
-    "legal",
-    "environmental",
+    "political",             # §7.3.1 السياسية
+    "social_humanitarian",   # §7.3.2 الاجتماعية والإنسانية
+    "technical",              # §7.3.3 التقنية
+    "legal",                  # §7.3.4 القانونية
+    "economic",                # §7.3.5 الاقتصادية
+    "health",                 # §7.3.6 الصحية
+    "environmental",           # §7.3.7 البيئية
 ]
 
-LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+# §7.2.1-7.2.4: مخاطر حرجة (Critical) / عالية (High) / محدودة (Limited) /
+# بسيطة أو منعدمة (Minimal-or-none), lowest to highest severity.
+LEVELS = ["MINIMAL", "LIMITED", "HIGH", "CRITICAL"]
 _LEVEL_RANK = {lvl: i for i, lvl in enumerate(LEVELS)}
 
 HIGH_RISK_SECTORS = {"telecom", "banking", "healthcare", "government", "energy"}
 
 # Categories where PII exposure or an autonomous decision loop matters most.
-_PII_SENSITIVE_CATEGORIES = {"financial", "legal", "health"}
+_PII_SENSITIVE_CATEGORIES = {"economic", "legal", "health"}
 
 
 def _max_level(*levels: str) -> str:
@@ -42,11 +49,11 @@ def classify_category(category: str, factors: dict[str, Any]) -> tuple[str, str]
     autonomy = factors.get("autonomy_level", "assisted")
     affected_population = factors.get("affected_population", "individual")  # individual|group|public
 
-    level = "LOW"
+    level = "MINIMAL"
     reasons = []
 
     if sector in HIGH_RISK_SECTORS:
-        level = _max_level(level, "MEDIUM")
+        level = _max_level(level, "LIMITED")
         reasons.append(f"regulated sector '{sector}'")
 
     if handles_pii and category in _PII_SENSITIVE_CATEGORIES:

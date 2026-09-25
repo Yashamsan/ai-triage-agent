@@ -2,9 +2,7 @@
 
 import csv
 import io
-import os
 
-from .decision import DecisionTransaction
 from .hasher import verify_chain
 from .ledger import JSONLLedger
 

@@ -1,6 +1,7 @@
 -- AI Triage Agent — Arabic/English schema
--- Requires pgvector extension (vector dim = 384)
--- Compatible with both all-MiniLM-L6-v2 and paraphrase-multilingual-MiniLM-L12-v2
+-- Requires pgvector extension (vector dim = 1024, BAAI/bge-m3 — see
+-- shared/embeddings.py; migrate_vector_dim() below handles the one-time
+-- resize from the old 384-dim all-MiniLM-L6-v2 columns)
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -9,7 +10,7 @@ CREATE TABLE IF NOT EXISTS faq_articles (
     intent      VARCHAR(50)  NOT NULL,
     title       TEXT         NOT NULL,
     content     TEXT         NOT NULL,
-    embedding   vector(384),
+    embedding   vector(1024),
     lang        VARCHAR(10)  DEFAULT 'en',
     created_at  TIMESTAMP    DEFAULT NOW()
 );
@@ -19,7 +20,7 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     user_message TEXT         NOT NULL,
     intent       VARCHAR(50),
     status       VARCHAR(20)  DEFAULT 'open',
-    embedding    vector(384),
+    embedding    vector(1024),
     lang         VARCHAR(10)  DEFAULT 'en',
     created_at   TIMESTAMP    DEFAULT NOW()
 );
@@ -44,10 +45,36 @@ CREATE TABLE IF NOT EXISTS knowledge_base_chunks (
     content     TEXT         NOT NULL,
     lang        VARCHAR(10)  DEFAULT 'en',
     metadata    JSONB        DEFAULT '{}',
-    embedding   vector(384),
+    embedding   vector(1024),
     created_at  TIMESTAMP    DEFAULT NOW()
 );
 ALTER TABLE knowledge_base_chunks ADD COLUMN IF NOT EXISTS lang VARCHAR(10) DEFAULT 'en';
+
+-- Same migration helper as app/schema.sql (duplicated, not imported, so this
+-- file stays applicable standalone per the comment above knowledge_base_chunks).
+-- See app/schema.sql for the full explanation.
+CREATE OR REPLACE FUNCTION migrate_vector_dim(
+    p_table TEXT, p_column TEXT, p_dim INT
+) RETURNS void AS $$
+DECLARE
+    current_dim INT;
+BEGIN
+    SELECT atttypmod INTO current_dim
+    FROM pg_attribute
+    WHERE attrelid = p_table::regclass
+      AND attname = p_column
+      AND NOT attisdropped;
+
+    IF current_dim IS DISTINCT FROM p_dim THEN
+        EXECUTE format('ALTER TABLE %I DROP COLUMN IF EXISTS %I', p_table, p_column);
+        EXECUTE format('ALTER TABLE %I ADD COLUMN %I vector(%s)', p_table, p_column, p_dim);
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT migrate_vector_dim('faq_articles', 'embedding', 1024);
+SELECT migrate_vector_dim('support_tickets', 'embedding', 1024);
+SELECT migrate_vector_dim('knowledge_base_chunks', 'embedding', 1024);
 
 -- HNSW indexes
 CREATE INDEX IF NOT EXISTS faq_embedding_hnsw

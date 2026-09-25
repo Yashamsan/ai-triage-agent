@@ -178,6 +178,8 @@ def register_agent(req: AgentRegistration):
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (agent_name, agent_version) DO UPDATE
             SET model_id            = EXCLUDED.model_id,
+                description         = EXCLUDED.description,
+                metadata            = EXCLUDED.metadata,
                 agent_group         = EXCLUDED.agent_group,
                 data_classification = EXCLUDED.data_classification,
                 last_seen           = NOW()

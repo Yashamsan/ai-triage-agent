@@ -82,7 +82,7 @@ def kb_lookup(user_message: str) -> ToolResult:
         with metrics.trace_latency("embedding"):
             embedding = trace_embedding(user_message)
         with metrics.trace_latency("kb_search"):
-            row = trace_kb_search(embedding)
+            row = trace_kb_search(embedding, query_text=user_message)
 
         hit = row is not None
         metrics.score_hit(hit)
@@ -90,8 +90,12 @@ def kb_lookup(user_message: str) -> ToolResult:
 
         if hit:
             return ToolResult(success=True, data=row["content"], resolved=True)
-    except Exception:
-        pass
+    except Exception as e:
+        # Distinguish "genuinely no KB match" from "the lookup itself broke"
+        # (e.g. a DB connection blip) -- both used to fall through to the
+        # same silent "we don't have that information" response, which reads
+        # as a real KB miss and hides infra failures during debugging.
+        print(f"[KB Lookup] embedding/search failed: {e}")
 
     return ToolResult(
         success=False,

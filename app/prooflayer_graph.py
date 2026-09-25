@@ -21,7 +21,8 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 from pgvector.psycopg2 import register_vector
-from sentence_transformers import SentenceTransformer
+
+from shared.embeddings import embed
 
 load_dotenv()
 
@@ -29,16 +30,6 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@localhost/triage_agent",
 )
-
-_model: SentenceTransformer | None = None
-
-
-def _get_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
-
 
 def _get_conn():
     return psycopg2.connect(DATABASE_URL, connect_timeout=3)
@@ -89,7 +80,7 @@ def record_decision(
         "session_id": session_id,
         "timestamp": datetime.now(UTC).isoformat(),
     }
-    snapshot_embedding = _get_model().encode(input_query) if input_query else None
+    snapshot_embedding = embed(input_query) if input_query else None
     cur.execute(
         """
         INSERT INTO pl_nodes (node_type, properties, embedding, agent_name,
@@ -99,7 +90,7 @@ def record_decision(
         """,
         (
             json.dumps(snapshot_props),
-            snapshot_embedding.tolist() if snapshot_embedding is not None else None,
+            snapshot_embedding,
             agent_name,
             contains_pii,
             agent_group,
@@ -419,7 +410,7 @@ def record_context_snapshot(
             (decision_node_id, model_version, active_policies,
              risk_scores, feature_flags, system_load)
         VALUES (%s, %s, %s, %s, %s, %s)
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (decision_node_id) DO NOTHING
         RETURNING context_id, captured_at
         """,
         (
@@ -500,8 +491,9 @@ def query_cross_agent(
     ]
     params: dict[str, Any] = {"since_days": since_days, "limit": limit}
 
-    if contains_pii is True:
-        clauses.append("contains_pii = TRUE")
+    if contains_pii is not None:
+        clauses.append("contains_pii = %(contains_pii)s")
+        params["contains_pii"] = contains_pii
     if agent_group:
         clauses.append("agent_group = %(agent_group)s")
         params["agent_group"] = agent_group

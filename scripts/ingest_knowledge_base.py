@@ -69,7 +69,7 @@ _BILINGUAL_REQUIRED = ["English Query", "English Content", "Arabic Query", "Arab
 _SIGNAL_COLUMNS = ["Keywords / Tags", "Confidence Triggers"]
 
 
-def _cell(row: "pd.Series", col: str) -> str:
+def _cell(row: pd.Series, col: str) -> str:
     val = row.get(col)
     return str(val).strip() if pd.notna(val) else ""
 
@@ -84,7 +84,7 @@ def _parse_metadata_cell(raw) -> dict:
         return {"raw_metadata": str(raw)}
 
 
-def _is_bilingual_schema(df: "pd.DataFrame") -> bool:
+def _is_bilingual_schema(df: pd.DataFrame) -> bool:
     return all(col in df.columns for col in _BILINGUAL_REQUIRED)
 
 
@@ -100,7 +100,7 @@ class Chunk:
         self.metadata = metadata
 
 
-def _bilingual_chunks(sheet_name: str, df: "pd.DataFrame") -> list[Chunk]:
+def _bilingual_chunks(sheet_name: str, df: pd.DataFrame) -> list[Chunk]:
     chunks: list[Chunk] = []
     for i, row in df.iterrows():
         row_ref = f"{sheet_name}!row{i + 2}"  # +2: header row + 0-index
@@ -136,7 +136,7 @@ def _bilingual_chunks(sheet_name: str, df: "pd.DataFrame") -> list[Chunk]:
     return chunks
 
 
-def _generic_chunks(sheet_name: str, df: "pd.DataFrame") -> list[Chunk]:
+def _generic_chunks(sheet_name: str, df: pd.DataFrame) -> list[Chunk]:
     chunks: list[Chunk] = []
     for i, row in df.iterrows():
         parts: list[str] = []

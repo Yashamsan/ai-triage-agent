@@ -15,11 +15,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from app.sdaia_storage import SDAIAStorage
-from app.sdaia_risk import assess_and_store, RISK_CATEGORIES
 from app import incidents as incidents_mod
-from app.safety_reports import generate_safety_report, SAFETY_REPORT_ITEMS
+from app.safety_reports import SAFETY_REPORT_ITEMS, generate_safety_report
 from app.sdaia_labels import compute_ethics_label
+from app.sdaia_risk import RISK_CATEGORIES, assess_and_store
+from app.sdaia_storage import SDAIAStorage
 
 
 def line(char="-", n=60):
@@ -80,21 +80,21 @@ def main():
     line()
     print("Step 3: Incident reporting")
     line()
-    medium_incident = incidents_mod.log_incident(
+    limited_incident = incidents_mod.log_incident(
         storage,
         agent_id=agent_id,
-        severity="MEDIUM",
-        category="financial",
+        severity="LIMITED",
+        category="economic",
         description="Refund amount miscalculated due to currency rounding error.",
     )
-    print(f"  Logged MEDIUM incident #{medium_incident['id']}")
+    print(f"  Logged LIMITED incident #{limited_incident['id']}")
     incidents_mod.resolve_incident(
         storage,
-        medium_incident["id"],
+        limited_incident["id"],
         root_cause="Rounding applied before currency conversion instead of after.",
         corrective_action="Fixed calculation order; added regression test.",
     )
-    print(f"  Resolved incident #{medium_incident['id']}")
+    print(f"  Resolved incident #{limited_incident['id']}")
 
     critical_incident = incidents_mod.log_incident(
         storage,
@@ -122,7 +122,7 @@ def main():
     line()
     print("Step 4: Safety report (10 items)")
     line()
-    report = generate_safety_report(storage, agent_id)
+    generate_safety_report(storage, agent_id)
     for i, item in enumerate(SAFETY_REPORT_ITEMS, start=1):
         print(f"  {i:2d}. {item}")
     print(f"\n  Safety report generated with all {len(SAFETY_REPORT_ITEMS)} items.")

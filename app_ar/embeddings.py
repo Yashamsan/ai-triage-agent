@@ -1,38 +1,25 @@
-"""Embeddings for Arabic agent — uses same model as English so vector spaces match.
+"""Embedding helper for the Arabic triage agent.
 
-Both agents share the same faq_articles table whose embeddings were generated
-with all-MiniLM-L6-v2. Using a different model here would put Arabic queries
-in a different vector space and break similarity search against that data.
-Switch to a multilingual model only after reseeding faq_articles with it.
+Thin re-export of shared/embeddings.py — the actual model is loaded once
+there and shared across app/, app_ar/, and the precedent/ProofLayer stores.
+Do not load a separate model here; see shared/embeddings.py's docstring.
+
+Both agents share the same faq_articles / knowledge_base_chunks tables and
+must use the same embedding model as app/embeddings.py so vector spaces
+match — that's exactly why this re-exports the same shared singleton
+instead of loading its own.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from langfuse import observe
 
-if TYPE_CHECKING:
-    from sentence_transformers import SentenceTransformer as _ST
+from shared.embeddings import EMBEDDING_DIM, MODEL_NAME, embed_batch
+from shared.embeddings import embed as _embed
 
-_model: _ST | None = None
-MODEL_NAME = "all-MiniLM-L6-v2"
-EMBEDDING_DIM = 384
-
-
-def _get_model() -> _ST:
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
-
-        _model = SentenceTransformer(MODEL_NAME)
-    return _model
+__all__ = ["MODEL_NAME", "EMBEDDING_DIM", "embed", "embed_batch"]
 
 
 @observe(name="embed_ar")
 def embed(text: str) -> list[float]:
-    return _get_model().encode(text, convert_to_numpy=True).tolist()
-
-
-def embed_batch(texts: list[str]) -> list[list[float]]:
-    return _get_model().encode(texts, convert_to_numpy=True).tolist()
+    return _embed(text)

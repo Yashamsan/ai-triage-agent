@@ -33,10 +33,22 @@ Respond ONLY in JSON format:
     "critique": "Brief 1-2 sentence explanation"
 }
 
-"product_inquiry" is a valid intent (informational questions about products,
-plans, pricing, policies, or how to reach/find the company) — it is NOT a
-missing category, do not flag it as needing revision just because it isn't
-one of the other four.
+"product_inquiry" is a valid intent — it is NOT a missing category, do not
+flag it as needing revision just because it isn't one of the other four.
+It covers BOTH informational questions (products, plans, pricing, policies,
+how to reach/find the company) AND how-to/procedural questions about a
+named company service or feature: "how do I activate call forwarding",
+"how do I cancel promotional SMS", "how do I set up eSIM", "how do I back
+up my VPN service" are all product_inquiry — the customer is asking how to
+use something the company offers, and that's exactly what the product
+knowledge base is for. Do not reclassify a how-to question about a named
+service to technical_support just because it describes an action rather
+than asking a pure fact.
+
+Reserve "technical_support" for something actually broken or erroring:
+the app crashing, an error message, a service that stopped working, a
+login/connectivity failure — not for "how do I do X", which is
+product_inquiry even when X is a technical-sounding action.
 
 Set needs_revision=false if the classification is accurate and appropriate.
 """
@@ -58,7 +70,15 @@ def _resolve_model() -> tuple[str, dict]:
         kwargs["api_base"] = api_base
     if api_key:
         kwargs["api_key"] = api_key
-    elif os.getenv("OPENROUTER_API_KEY"):
+    elif model.startswith("openrouter/") and os.getenv("OPENROUTER_API_KEY"):
+        # See app/response_generator.py for why this must be gated on the
+        # model actually being an openrouter/ one — it previously fired for
+        # the "deepseek/deepseek-chat" default too, sending an OpenRouter key
+        # to DeepSeek's API and failing every single reflection call. Because
+        # reflection_check()'s caller treats a failed/empty result as "no
+        # revision needed" (fail safe), this was invisible: reflection looked
+        # like it was silently agreeing with the classifier on everything,
+        # when it was actually never running at all.
         kwargs["api_key"] = os.getenv("OPENROUTER_API_KEY")
     return model, kwargs
 

@@ -1,12 +1,16 @@
-"""Safety report generator for the SDAIA compliance module (illustrative scaffold).
+"""Safety report generator for the SDAIA compliance module.
 
-Produces a 10-item safety report per agent, assembled from stored risk
-assessments, decisions, and incidents. The 10-item structure is modeled
-loosely on common AI-safety-report checklists (system description, risk
-rationale, data governance, fairness testing, human oversight, incident
-history, performance metrics, explainability, security testing, and a
-compliance attestation) — it is not a verified transcription of a
-specific SDAIA document section.
+Produces the 10-item safety report required by the SDAIA "Responsible AI
+Policy" §8.8.1-8.8.10 before publishing a high-risk system (or any of its
+releases). Each item is populated with real computed evidence where this
+schema actually tracks it (risk categories, incident history, human-review
+flags); where the policy asks for something this schema has no signal for
+(per-language test coverage, modality-specific adversarial results,
+jailbreak/security testing, model-version diffs), the item is returned with
+`requires_manual_attestation: True` and no fabricated content — a report
+that silently claims a section is satisfied when nothing was actually
+verified is worse than one that says so plainly, since someone reading the
+dashboard would otherwise take "present" to mean "tested."
 """
 from __future__ import annotations
 
@@ -14,17 +18,18 @@ import time
 
 from app.sdaia_storage import to_epoch
 
+# §8.8.1-8.8.10, in document order.
 SAFETY_REPORT_ITEMS = [
-    "system_description",
-    "risk_classification_rationale",
-    "data_governance_and_privacy",
-    "bias_and_fairness_testing",
-    "human_oversight_mechanisms",
-    "incident_history_and_remediation",
-    "performance_and_accuracy_metrics",
-    "explainability_and_transparency",
-    "security_and_robustness_testing",
-    "compliance_attestation",
+    "safety_barriers_and_tools",                    # §8.8.1
+    "multilingual_testing_coverage",                  # §8.8.2
+    "misuse_and_adversarial_scenario_results",          # §8.8.3
+    "legal_and_human_principles_violation_testing",       # §8.8.4
+    "expert_informed_incident_scenarios",                  # §8.8.5
+    "jailbreak_and_vulnerability_testing",                   # §8.8.6
+    "pre_publish_model_modifications",                        # §8.8.7
+    "expected_risk_types_and_mitigation",                       # §8.8.8
+    "post_deployment_continuous_protection",                     # §8.8.9
+    "periodic_report_updates",                                    # §8.8.10
 ]
 
 
@@ -39,78 +44,94 @@ def generate_safety_report(storage, agent_id: str, period_days: int | None = Non
     risk_assessments = storage.get_risk_assessments(agent_id)
     decisions = storage.list_decisions(agent_id)
     incidents = storage.list_incidents(agent_id=agent_id)
+    prior_reports = storage.get_latest_safety_report(agent_id)
 
-    cutoff_epoch = None
     if period_days is not None:
         cutoff_epoch = time.time() - (period_days * 86400)
         decisions = [d for d in decisions if to_epoch(d["created_at"]) >= cutoff_epoch]
         incidents = [i for i in incidents if to_epoch(i["detected_at"]) >= cutoff_epoch]
 
-    overall_level = "LOW"
-    if risk_assessments:
-        rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
-        overall_level = max((r["level"] for r in risk_assessments), key=lambda l: rank[l])
-
     resolved = [i for i in incidents if i.get("resolved_at")]
-    unresolved = [i for i in incidents if not i.get("resolved_at")]
-    critical_reported = [
-        i for i in incidents if i["severity"] == "CRITICAL" and i.get("reported_to_regulator")
-    ]
-
     human_reviewed_decisions = [d for d in decisions if d.get("requires_human_review")]
+    legal_incidents = [i for i in incidents if i["category"] == "legal"]
 
     report = {
-        "system_description": {
-            "agent_id": agent_id,
-            "name": agent["name"],
-            "sector": agent["sector"],
-            "description": agent.get("description") or "",
+        "safety_barriers_and_tools": {
             "autonomy_level": agent["autonomy_level"],
-            "handles_pii": bool(agent["handles_pii"]),
-            "report_period_days": period_days,
+            "decisions_with_human_review": len(human_reviewed_decisions),
+            "total_decisions": len(decisions),
+            "requires_manual_attestation": True,
+            "attestation_note": (
+                "Human-in-the-loop signal above is computed from decision logs; "
+                "the actual barrier/tool inventory (filters, model-alignment "
+                "techniques, refusal policies, risk monitors) is not tracked "
+                "in this schema and must be attached separately."
+            ),
         },
-        "risk_classification_rationale": {
-            "overall_level": overall_level,
-            "categories": [
+        "multilingual_testing_coverage": {
+            "requires_manual_attestation": True,
+            "attestation_note": "Per-language test coverage is not tracked in this schema.",
+        },
+        "misuse_and_adversarial_scenario_results": {
+            "incidents_on_record": len(incidents),
+            "requires_manual_attestation": True,
+            "attestation_note": (
+                "Real incidents are listed as partial evidence but are not a "
+                "substitute for controlled misuse/adversarial testing across "
+                "text, code, image, audio, and video modalities."
+            ),
+        },
+        "legal_and_human_principles_violation_testing": {
+            "legal_category_incidents": len(legal_incidents),
+            "requires_manual_attestation": True,
+            "attestation_note": (
+                "Legal-category incident count is partial evidence only; "
+                "structured legal/human-principles violation test results "
+                "are not tracked in this schema."
+            ),
+        },
+        "expert_informed_incident_scenarios": {
+            "incidents_with_documented_root_cause": len(
+                [i for i in incidents if i.get("root_cause")]
+            ),
+            "requires_manual_attestation": True,
+            "attestation_note": (
+                "Resolved incidents with a root cause are listed as partial "
+                "evidence; expert-constructed realistic incident scenarios "
+                "(legal, health, social, security specialists) are not "
+                "tracked in this schema."
+            ),
+        },
+        "jailbreak_and_vulnerability_testing": {
+            "requires_manual_attestation": True,
+            "attestation_note": "Jailbreak/security-vulnerability test results are not tracked in this schema.",
+        },
+        "pre_publish_model_modifications": {
+            "requires_manual_attestation": True,
+            "attestation_note": "Model version/modification history is not tracked in this schema.",
+        },
+        "expected_risk_types_and_mitigation": {
+            "risk_categories": [
                 {"category": r["category"], "level": r["level"], "rationale": r["rationale"]}
                 for r in risk_assessments
             ],
+            "mitigation_actions_on_record": [
+                i["corrective_action"] for i in resolved if i.get("corrective_action")
+            ],
         },
-        "data_governance_and_privacy": {
-            "handles_pii": bool(agent["handles_pii"]),
-            "note": "PII handling requires access controls and retention limits."
-            if agent["handles_pii"]
-            else "No personal data processed by this agent.",
-        },
-        "bias_and_fairness_testing": {
-            "decisions_sampled": len(decisions),
-            "note": "Fairness testing should be run against decision logs per release cycle.",
-        },
-        "human_oversight_mechanisms": {
-            "decisions_flagged_for_review": len(human_reviewed_decisions),
-            "total_decisions": len(decisions),
-        },
-        "incident_history_and_remediation": {
-            "total_incidents": len(incidents),
-            "resolved": len(resolved),
-            "unresolved": len(unresolved),
-            "critical_reported_to_regulator": len(critical_reported),
-        },
-        "performance_and_accuracy_metrics": {
-            "total_decisions_logged": len(decisions),
-            "note": "Attach accuracy/precision/recall metrics from evaluation harness here.",
-        },
-        "explainability_and_transparency": {
-            "note": "Each decision record includes an input/output summary for auditability.",
-        },
-        "security_and_robustness_testing": {
-            "note": "Attach adversarial/robustness test results here.",
-        },
-        "compliance_attestation": {
-            "all_items_present": True,
-            "unresolved_critical_incidents": len(
-                [i for i in unresolved if i["severity"] == "CRITICAL"]
+        "post_deployment_continuous_protection": {
+            "open_incidents": len([i for i in incidents if not i.get("resolved_at")]),
+            "requires_manual_attestation": True,
+            "attestation_note": (
+                "Open-incident count is partial evidence; real-time monitoring "
+                "configuration for inputs/outputs during operation is not "
+                "tracked in this schema."
             ),
+        },
+        "periodic_report_updates": {
+            "report_period_days": period_days,
+            "prior_report_on_file": prior_reports is not None,
+            "prior_report_generated_at": prior_reports["generated_at"] if prior_reports else None,
         },
     }
 

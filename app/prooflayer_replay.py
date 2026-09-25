@@ -40,17 +40,25 @@ def _chain_integrity() -> dict[str, Any]:
         from audit.ledger import JSONLLedger
 
         ledger = JSONLLedger()
-        records = ledger.read_all()
-        if not records:
-            return {"status": "NO_RECORDS", "record_count": 0}
-        violations = verify_chain(records)
-        return {
-            "status": "INTACT" if not violations else "BROKEN",
-            "record_count": len(records),
-            "broken_at_index": violations[0] if violations else None,
-        }
     except Exception as exc:
         return {"status": "UNAVAILABLE", "reason": str(exc)}
+
+    try:
+        records = ledger.read_all()
+    except Exception as exc:
+        # A malformed/truncated line is exactly what tampering with an
+        # append-only ledger looks like -- report it as BROKEN, not as
+        # merely UNAVAILABLE, so it isn't mistaken for "nothing to check."
+        return {"status": "BROKEN", "reason": f"Ledger unreadable or corrupted: {exc}"}
+
+    if not records:
+        return {"status": "NO_RECORDS", "record_count": 0}
+    violations = verify_chain(records)
+    return {
+        "status": "INTACT" if not violations else "BROKEN",
+        "record_count": len(records),
+        "broken_at_index": violations[0] if violations else None,
+    }
 
 
 # ── Replay ────────────────────────────────────────────────────────────────────
@@ -341,10 +349,11 @@ def blame_decision(decision_id: str) -> dict[str, Any]:
               AND snap.embedding IS NOT NULL
               AND n.node_id != %s
               AND n.properties->>'decision_value' != %s
+              AND n.created_at < %s
             ORDER BY snap.embedding <=> %s::vector
             LIMIT 1
             """,
-            (emb_str, decision_id, target["decision_value"], emb_str),
+            (emb_str, decision_id, target["decision_value"], target["created_at"], emb_str),
         )
         similar_row = cur.fetchone()
         if similar_row and similar_row["distance"] < 0.25:  # cos distance < 0.25 = similar

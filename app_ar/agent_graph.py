@@ -9,11 +9,13 @@ Mirrors app/agent_graph.py Week 7 architecture; Arabic-specific:
   - Shared memory and precedent_store (sessions prefixed ar_ in main.py)
 """
 
-from typing import Literal, TypedDict
+import operator
+from typing import Annotated, Literal, TypedDict
 
 from langfuse import observe
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
+from langgraph.types import interrupt
 
 from app_ar.classifier import classify_ar
 from app_ar.reflection import reflect as reflection_check
@@ -48,6 +50,8 @@ class AgentState(TypedDict):
     precedent_context: str
     # Final output
     response_text: str
+    # ProofLayer Reasoning Memory — each node appends one Thought->Action->Observation step
+    trace_steps: Annotated[list[dict], operator.add]
 
 
 # ── Nodes ─────────────────────────────────────────────────────────────────────
@@ -81,6 +85,13 @@ def classifier_node(state: AgentState) -> dict:
         "needs_escalation": result.needs_escalation,
         "context_history": context_history,
         "precedent_context": precedent_text,
+        "trace_steps": [{
+            "node_type": "classifier",
+            "thought": "Classify the customer message into one of the known intents.",
+            "action": "classify_ar(message)",
+            "observation": f"intent={result.intent}, confidence={result.confidence:.2f}, needs_escalation={result.needs_escalation}",
+            "confidence": result.confidence,
+        }],
     }
 
 
@@ -92,6 +103,13 @@ def reflection_node(state: AgentState) -> dict:
             "revised_intent": None,
             "revised_confidence": state["confidence"],
             "critique": None,
+            "trace_steps": [{
+                "node_type": "reflect",
+                "thought": "Greeting/unknown intents skip reflection review.",
+                "action": "skipped",
+                "observation": "no_revision_needed",
+                "confidence": state["confidence"],
+            }],
         }
 
     context_parts = []
@@ -119,6 +137,13 @@ def reflection_node(state: AgentState) -> dict:
             "needs_escalation": (
                 True if revised == "escalation" else state["needs_escalation"]
             ),
+            "trace_steps": [{
+                "node_type": "reflect",
+                "thought": "Review the classifier's output for accuracy before acting on it.",
+                "action": "reflection_check(query, classification, confidence, context)",
+                "observation": f"revised_intent={revised}, confidence_adjustment={adj:+.2f}, critique={(result.get('critique') or '')[:150]}",
+                "confidence": max(0.0, state["confidence"] + adj),
+            }],
         }
 
     return {
@@ -126,6 +151,13 @@ def reflection_node(state: AgentState) -> dict:
         "revised_intent": state["intent"],
         "revised_confidence": state["confidence"],
         "critique": None,
+        "trace_steps": [{
+            "node_type": "reflect",
+            "thought": "Review the classifier's output for accuracy before acting on it.",
+            "action": "reflection_check(query, classification, confidence, context)",
+            "observation": "classification_confirmed_no_revision",
+            "confidence": state["confidence"],
+        }],
     }
 
 
@@ -138,6 +170,12 @@ def tool_runner_node(state: AgentState) -> dict:
     return {
         "tool_output": tool_result.data if tool_result else "",
         "resolved": tool_result.resolved if tool_result else False,
+        "trace_steps": [{
+            "node_type": "tool_runner",
+            "thought": f"Run the tool bound to intent '{effective_intent}' to gather grounding information.",
+            "action": f"run_tool('{effective_intent}', message)",
+            "observation": f"resolved={tool_result.resolved if tool_result else False}, output_preview={(tool_result.data if tool_result else '')[:150]!r}",
+        }],
     }
 
 
@@ -161,16 +199,24 @@ def store_memory_node(state: AgentState) -> dict:
         "critique": state.get("critique"),
         "session_id": state.get("session_id"),
     }
+    store_outcome = "stored"
     try:
         store_trace(trace)
-    except Exception:
-        pass
+    except Exception as e:
+        store_outcome = f"failed: {e}"
 
     session = get_session(state.get("session_id") or "ar_default")
     session.add_turn("assistant", f"تم التصنيف كـ: {effective_intent}")
     session.escalation_level = 2 if state["needs_escalation"] else 1
 
-    return {}
+    return {
+        "trace_steps": [{
+            "node_type": "store_memory",
+            "thought": "Persist this turn to session memory and the precedent store for future recall.",
+            "action": "store_trace(trace)",
+            "observation": store_outcome,
+        }],
+    }
 
 
 @observe(name="responder-node-ar")
@@ -184,6 +230,7 @@ def responder_node(state: AgentState) -> dict:
         "password_reset": "إعادة تعيين كلمة المرور",
         "billing": "الفواتير والمدفوعات",
         "technical_support": "الدعم التقني",
+        "product_inquiry": "استفسار عن الخدمة",
         "escalation": "التصعيد",
         "unknown": "غير محدد",
     }
@@ -210,7 +257,16 @@ def responder_node(state: AgentState) -> dict:
         f"الثقة: {state['revised_confidence']:.0%}"
         f"{revision_note}"
     )
-    return {"response_text": response}
+    return {
+        "response_text": response,
+        "trace_steps": [{
+            "node_type": "responder",
+            "thought": f"Synthesize a final Arabic response for intent '{effective_intent}' from the retrieved tool output and context.",
+            "action": "generate_response_ar(message, intent, tool_output, context_history, precedent_context, confidence, critique)",
+            "observation": generated[:200],
+            "confidence": state["revised_confidence"],
+        }],
+    }
 
 
 @observe(name="escalation-node-ar")
@@ -224,21 +280,52 @@ def escalation_node(state: AgentState) -> dict:
         "password_reset": "إعادة تعيين كلمة المرور",
         "billing": "الفواتير والمدفوعات",
         "technical_support": "الدعم التقني",
+        "product_inquiry": "استفسار عن الخدمة",
         "escalation": "التصعيد",
         "unknown": "غير محدد",
     }
     label = intent_labels.get(effective_intent, effective_intent)
 
-    response = (
-        f"**يتطلب التصعيد**\n\n"
-        f"**النوع:** {label}\n"
-        f"**الثقة:** {state['revised_confidence']:.0%}\n\n"
-        f"{state['tool_output']}\n\n"
-        f"---\nسيتواصل معك وكيل دعم أول قريباً."
-    )
+    # Pause here for a real human decision — resumed via POST /triage/resume
+    # with Command(resume=approved). Without this, escalation always
+    # auto-completed and /triage/resume was unreachable dead code.
+    approved = interrupt({
+        "reason": "Escalation requires human approval before a ticket is finalized.",
+        "intent": effective_intent,
+        "message": state["message"],
+        "confidence": state["revised_confidence"],
+    })
+
+    if approved:
+        response = (
+            f"**يتطلب التصعيد**\n\n"
+            f"**النوع:** {label}\n"
+            f"**الثقة:** {state['revised_confidence']:.0%}\n\n"
+            f"{state['tool_output']}\n\n"
+            f"---\nسيتواصل معك وكيل دعم أول قريباً."
+        )
+        observation = "escalation_approved_ticket_created"
+    else:
+        response = (
+            f"**تمت مراجعة الطلب**\n\n"
+            f"راجع أحد وكلاء الدعم الأوائل هذا الطلب وقرر أنه لا يتطلب تصعيداً رسمياً. "
+            f"إليك ما يمكنني مساعدتك به مباشرة:\n\n"
+            f"{state['tool_output']}"
+        )
+        observation = "escalation_declined_by_human_reviewer"
+
     if state.get("critique"):
         response += f"\n\n*ملاحظة المراجع: {state['critique']}*"
-    return {"response_text": response}
+    return {
+        "response_text": response,
+        "trace_steps": [{
+            "node_type": "escalation",
+            "thought": f"Intent '{effective_intent}' was flagged for human escalation — pause for human approval before finalizing.",
+            "action": "interrupt() -> await human decision, then build response from resume value",
+            "observation": observation,
+            "confidence": state["revised_confidence"],
+        }],
+    }
 
 
 # ── Routing ───────────────────────────────────────────────────────────────────

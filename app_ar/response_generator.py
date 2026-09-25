@@ -51,7 +51,15 @@ def _resolve_model() -> tuple[str, dict]:
         kwargs["api_base"] = api_base
     if api_key:
         kwargs["api_key"] = api_key
-    elif os.getenv("OPENROUTER_API_KEY"):
+    elif model.startswith("openrouter/") and os.getenv("OPENROUTER_API_KEY"):
+        # This branch previously fired for ANY model whenever OPENROUTER_API_KEY
+        # was set — including the "deepseek/deepseek-chat" default — which sent
+        # an OpenRouter key to DeepSeek's API on every single call. It failed
+        # silently (see the except below) and fell back to raw tool_output,
+        # which is why "synthesized" responses often looked like an unedited
+        # dump of the retrieved KB/FAQ content instead of natural prose.
+        # litellm auto-resolves DEEPSEEK_API_KEY for "deepseek/" models on its
+        # own, so leaving kwargs empty in that case is correct.
         kwargs["api_key"] = os.getenv("OPENROUTER_API_KEY")
     return model, kwargs
 
@@ -102,5 +110,6 @@ def generate_response_ar(
         )
         generated = (response.choices[0].message.content or "").strip()
         return generated if generated else tool_output
-    except Exception:
+    except Exception as exc:
+        print(f"[ResponseGenerator-AR] LLM synthesis failed, falling back to raw tool_output: {exc}")
         return tool_output

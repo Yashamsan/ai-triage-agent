@@ -3,7 +3,7 @@
 import hashlib
 import inspect
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import wraps
 
 from .decision import DecisionTransaction
@@ -23,9 +23,14 @@ def audit_record(agent_id: str = "ai-triage-agent", model_id: str = "unknown"):
                     break
             if not input_text and "user_message" in kwargs:
                 input_text = kwargs["user_message"]
-            # Also look for Pydantic request objects (e.g. TriageRequest)
+            # Also look for Pydantic request objects (e.g. TriageRequest) —
+            # FastAPI invokes endpoint functions with everything passed as
+            # kwargs (request=..., background_tasks=...), not positionally,
+            # so args is normally empty here and this must check kwargs.values()
+            # too or it silently never finds the message (every ledger entry
+            # then records the hash/preview of "").
             if not input_text:
-                for arg in args:
+                for arg in (*args, *kwargs.values()):
                     msg = getattr(arg, "message", None)
                     if isinstance(msg, str):
                         input_text = msg
@@ -59,7 +64,7 @@ def audit_record(agent_id: str = "ai-triage-agent", model_id: str = "unknown"):
                 transaction_id=str(uuid.uuid4()),
                 agent_id=agent_id,
                 session_id=session_id,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 decision_type=decision_type,
                 input_hash=input_hash,
                 input_preview=input_preview,

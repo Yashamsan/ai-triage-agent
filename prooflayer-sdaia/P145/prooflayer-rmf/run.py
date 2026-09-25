@@ -1,0 +1,5 @@
+"""Quick start: python run.py  (starts the RMF app on port 8090)."""
+import uvicorn
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8090, reload=True)

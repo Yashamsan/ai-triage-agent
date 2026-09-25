@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS risk_assessments (
     id              SERIAL PRIMARY KEY,
     agent_id        TEXT NOT NULL REFERENCES agents(agent_id),
     category        TEXT NOT NULL,          -- one of the 7 risk categories
-    level           TEXT NOT NULL,          -- LOW | MEDIUM | HIGH | CRITICAL
+    level           TEXT NOT NULL,          -- MINIMAL | LIMITED | HIGH | CRITICAL
     rationale       TEXT NOT NULL,
     factors         JSONB NOT NULL DEFAULT '{}',
     assessed_at     TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS decisions (
 CREATE TABLE IF NOT EXISTS incidents (
     id                      SERIAL PRIMARY KEY,
     agent_id                TEXT NOT NULL REFERENCES agents(agent_id),
-    severity                TEXT NOT NULL,      -- LOW | MEDIUM | HIGH | CRITICAL
+    severity                TEXT NOT NULL,      -- MINIMAL | LIMITED | HIGH | CRITICAL
     category                TEXT NOT NULL,
     description             TEXT NOT NULL,
     detected_at             TIMESTAMPTZ NOT NULL DEFAULT now(),

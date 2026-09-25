@@ -1,37 +1,21 @@
-"""Embedding helper via sentence-transformers.
+"""Embedding helper for the English triage agent.
 
-Uses all-MiniLM-L6-v2 (384-dim, ~80MB). Model is loaded once and cached
-as a module-level singleton to avoid re-loading on every call.
+Thin re-export of shared/embeddings.py — the actual model is loaded once
+there and shared across app/, app_ar/, and the precedent/ProofLayer stores.
+Do not load a separate model here; see shared/embeddings.py's docstring.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from langfuse import observe
 
-if TYPE_CHECKING:
-    from sentence_transformers import SentenceTransformer as _ST
+from shared.embeddings import EMBEDDING_DIM, MODEL_NAME, embed_batch
+from shared.embeddings import embed as _embed
 
-_model: _ST | None = None
-MODEL_NAME = "all-MiniLM-L6-v2"
-EMBEDDING_DIM = 384
-
-
-def _get_model() -> _ST:
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer(MODEL_NAME)
-    return _model
+__all__ = ["MODEL_NAME", "EMBEDDING_DIM", "embed", "embed_batch"]
 
 
 @observe(name="embed")
 def embed(text: str) -> list[float]:
-    """Return a 384-dim embedding for text."""
-    return _get_model().encode(text, convert_to_numpy=True).tolist()
-
-
-def embed_batch(texts: list[str]) -> list[list[float]]:
-    """Embed multiple texts in one forward pass (faster for seeding)."""
-    return _get_model().encode(texts, convert_to_numpy=True).tolist()
+    """Return an EMBEDDING_DIM-dim embedding for text."""
+    return _embed(text)

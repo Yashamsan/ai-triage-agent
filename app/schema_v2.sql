@@ -37,6 +37,22 @@ CREATE INDEX IF NOT EXISTS idx_pl_nodes_type_created
 CREATE INDEX IF NOT EXISTS idx_pl_nodes_search
     ON pl_nodes USING GIN(search_vector);
 
+-- Embedding-dimension migration (BAAI/bge-m3, 1024-dim, replacing the old
+-- 384-dim all-MiniLM-L6-v2 embeddings) — migrate_vector_dim() is defined in
+-- app/schema.sql, which always applies before this file (see apply_schema()'s
+-- call order in app/database.py). Dropping/recreating this column loses any
+-- existing pl_nodes embeddings and the HNSW index that pointed at it (cascade
+-- drop); those embeddings aren't re-populated by anything today (ProofLayer
+-- node similarity search over historical nodes goes blank for pre-migration
+-- rows), which is an acceptable trade for this table. Re-create the index
+-- afterward — schema_prooflayer.sql, which originally created it, isn't
+-- wired into the automated apply_schema() chain, so this is the one place
+-- that reliably runs after the column is recreated.
+SELECT migrate_vector_dim('pl_nodes', 'embedding', 1024);
+
+CREATE INDEX IF NOT EXISTS idx_pl_nodes_embedding
+    ON pl_nodes USING hnsw (embedding vector_cosine_ops);
+
 -- ── Full-text search trigger ──────────────────────────────────────────────────
 -- Indexes all text values inside the properties JSONB blob plus node_type
 -- so queries like "mortgage Ahmed rejected" hit the right Decision nodes.

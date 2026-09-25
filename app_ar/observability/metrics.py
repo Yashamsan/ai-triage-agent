@@ -57,10 +57,10 @@ def trace_vector_search(intent: str, embedding: list[float]) -> dict[str, Any] |
 
 
 @observe(name="trace-kb-search-ar")
-def trace_kb_search(embedding: list[float]) -> dict[str, Any] | None:
+def trace_kb_search(embedding: list[float], query_text: str = "") -> dict[str, Any] | None:
     from app_ar.database import find_kb_chunk
 
-    return find_kb_chunk(embedding)
+    return find_kb_chunk(embedding, query_text=query_text)
 
 
 @observe(name="trace-ticket-creation-ar")

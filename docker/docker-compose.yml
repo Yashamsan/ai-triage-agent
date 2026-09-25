@@ -150,9 +150,30 @@ services:
       # Override DATABASE_URL so the app talks to the triage-db container,
       # not localhost (which doesn't exist inside Docker).
       DATABASE_URL: "postgresql://postgres:postgres@triage-db:5432/triage_agent"
+      # Forced to CPU for now: on this host (12GB RAM, GTX 1650 4GB VRAM),
+      # GPU mode's ~2GB host RAM + ~3.4GB VRAM footprint left too little
+      # headroom for Docker Desktop's own port-forwarding to stay reliable
+      # under real request load — reproducible connection resets on /triage.
+      # Remove this line to re-enable GPU once more headroom is available
+      # (e.g. a machine with more RAM, or freeing enough on this one).
+      EMBEDDING_DEVICE: "cpu"
     volumes:
       - triage_audit_data:/home/appuser/app/audit_data
     restart: unless-stopped
+    # Passes the host's GPU through so shared/embeddings.py can load bge-m3
+    # onto it (fp16, see that file) instead of this box's slow CPU-only
+    # inference. Requires Docker Desktop's GPU support (WSL2 backend) and an
+    # NVIDIA driver on the host — confirmed working here via
+    # `docker run --rm --gpus all nvidia/cuda:... nvidia-smi`. If the GPU
+    # isn't available for any reason, shared/embeddings.py falls back to CPU
+    # on its own rather than failing to start.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   # Reverse proxy — serves the chat UI + API on http://localhost:80
   nginx:

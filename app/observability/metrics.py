@@ -71,10 +71,10 @@ def trace_vector_search(intent: str, embedding: list[float]) -> dict[str, Any] |
 
 
 @observe(name="trace-kb-search")
-def trace_kb_search(embedding: list[float]) -> dict[str, Any] | None:
+def trace_kb_search(embedding: list[float], query_text: str = "") -> dict[str, Any] | None:
     """Run pgvector cosine search over the private knowledge base (or None)."""
     from app.database import find_kb_chunk
-    return find_kb_chunk(embedding)
+    return find_kb_chunk(embedding, query_text=query_text)
 
 
 @observe(name="trace-ticket-creation")

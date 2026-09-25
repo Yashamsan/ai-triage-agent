@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_trace_steps_decision
 
 CREATE TABLE IF NOT EXISTS pl_exceptions (
     exception_id      BIGSERIAL PRIMARY KEY,
-    decision_node_id  BIGINT    NOT NULL REFERENCES pl_nodes(node_id) ON DELETE CASCADE,
+    decision_node_id  UUID      NOT NULL REFERENCES pl_nodes(node_id) ON DELETE CASCADE,
     human_narrative   TEXT      NOT NULL,
     approver          TEXT,
     approval_channel  TEXT,                -- slack / email / in-person / ticket
@@ -66,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_exceptions_severity
 
 CREATE TABLE IF NOT EXISTS pl_decision_contexts (
     context_id        BIGSERIAL PRIMARY KEY,
-    decision_node_id  BIGINT    NOT NULL REFERENCES pl_nodes(node_id) ON DELETE CASCADE,
+    decision_node_id  UUID      NOT NULL REFERENCES pl_nodes(node_id) ON DELETE CASCADE,
     model_version     TEXT,
     active_policies   JSONB     DEFAULT '[]',
     risk_scores       JSONB     DEFAULT '{}',
@@ -75,7 +75,11 @@ CREATE TABLE IF NOT EXISTS pl_decision_contexts (
     captured_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_decision_contexts_decision
+-- UNIQUE, not a plain index: this is the "immutable snapshot" -- exactly
+-- one Event Clock row per decision -- and record_context_snapshot()'s
+-- ON CONFLICT (decision_node_id) DO NOTHING relies on this constraint
+-- existing to actually be idempotent rather than a silent no-op.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_decision_contexts_decision
     ON pl_decision_contexts (decision_node_id);
 
 -- ── pl_policies ───────────────────────────────────────────────────────────────

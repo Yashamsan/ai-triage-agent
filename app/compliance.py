@@ -479,8 +479,14 @@ def _c8_1(agent_name: str | None = None) -> CheckResult:
 
 
 def _c8_2(agent_name: str | None = None) -> CheckResult:
-    snapshots = _count("SELECT COUNT(*) FROM pl_nodes WHERE node_type='ContextSnapshot'")
-    linked = _count("SELECT COUNT(*) FROM pl_edges WHERE edge_type='USED_CONTEXT'")
+    af, ap = _af(agent_name)
+    snapshots = _count(f"SELECT COUNT(*) FROM pl_nodes WHERE node_type='ContextSnapshot'{af}", ap)
+    linked = _count(
+        "SELECT COUNT(*) FROM pl_edges e "
+        "JOIN pl_nodes s ON s.node_id = e.to_node_id AND s.node_type = 'ContextSnapshot' "
+        "WHERE e.edge_type = 'USED_CONTEXT'" + (" AND s.agent_name = %s" if agent_name else ""),
+        (agent_name,) if agent_name else (),
+    )
     if snapshots > 0 and linked > 0:
         return CheckResult(
             PARTIAL,
@@ -697,7 +703,14 @@ def _a2_1(agent_name: str | None = None) -> CheckResult:
 
 
 def _a2_2(agent_name: str | None = None) -> CheckResult:
-    applied = _count("SELECT COUNT(*) FROM pl_edges WHERE edge_type='APPLIED_POLICY'")
+    # APPLIED_POLICY edges carry no agent_name themselves -- scope via the
+    # Decision node each edge originates from.
+    applied = _count(
+        "SELECT COUNT(*) FROM pl_edges e "
+        "JOIN pl_nodes d ON d.node_id = e.from_node_id AND d.node_type = 'Decision' "
+        "WHERE e.edge_type = 'APPLIED_POLICY'" + (" AND d.agent_name = %s" if agent_name else ""),
+        (agent_name,) if agent_name else (),
+    )
     if applied >= 5:
         return CheckResult(
             MET,
@@ -810,7 +823,8 @@ def _a5_1(agent_name: str | None = None) -> CheckResult:
 
 
 def _a5_2(agent_name: str | None = None) -> CheckResult:
-    snapshots = _count("SELECT COUNT(*) FROM pl_nodes WHERE node_type='ContextSnapshot'")
+    af, ap = _af(agent_name)
+    snapshots = _count(f"SELECT COUNT(*) FROM pl_nodes WHERE node_type='ContextSnapshot'{af}", ap)
     if snapshots > 0:
         return CheckResult(
             PARTIAL,
@@ -885,10 +899,12 @@ def _a6_3(agent_name: str | None = None) -> CheckResult:
 
 
 def _a6_4(agent_name: str | None = None) -> CheckResult:
+    af, ap = _af(agent_name)
     with_input = _count(
         "SELECT COUNT(*) FROM pl_nodes "
         "WHERE node_type='ContextSnapshot' AND properties->>'input_query' != '' "
-        "AND properties->>'input_query' IS NOT NULL"
+        f"AND properties->>'input_query' IS NOT NULL{af}",
+        ap,
     )
     if with_input > 0:
         return CheckResult(
@@ -1106,7 +1122,10 @@ def _a10_2(agent_name: str | None = None) -> CheckResult:
         f"WHERE node_type='Decision' AND agent_name IS NOT NULL{af}",
         ap,
     )
-    multilingual = any("ar" in (r["agent_name"] or "") for r in agents)
+    # Substring "ar" in agent_name would false-positive on names like
+    # "card_disputes" or "warranty_agent" -- match this codebase's actual
+    # Arabic-variant naming convention instead (e.g. "triage-agent-ar").
+    multilingual = any((r["agent_name"] or "").endswith(("-ar", "_ar")) for r in agents)
     if multilingual:
         return CheckResult(
             PARTIAL,
@@ -1226,12 +1245,12 @@ def _pl_exception_tracking(agent_name: str | None = None) -> CheckResult:
             "Use POST /api/v1/exceptions to capture approver narrative for every policy exception.",
             {"exception_count": 0, "override_count": 0},
         )
-    if exc_count == 0 and override_count > 0:
+    if exc_count < override_count:
         return CheckResult(
             PARTIAL,
-            f"{override_count} human overrides found but no structured exception narratives captured.",
+            f"{exc_count} exception narrative(s) captured but {override_count} human overrides recorded — coverage incomplete.",
             "For each override, post a human narrative via POST /api/v1/exceptions with approver and justification.",
-            {"exception_count": 0, "override_count": override_count},
+            {"exception_count": exc_count, "override_count": override_count},
         )
     return CheckResult(
         MET,
@@ -1263,8 +1282,9 @@ def _pl_trace_steps(agent_name: str | None = None) -> CheckResult:
             "Emit trace steps per graph node via POST /api/v1/trace-steps or include trace_steps[] in POST /api/v1/decisions.",
             {"step_count": 0, "decision_count": decision_count},
         )
-    pct = round(step_count / max(decision_count, 1), 1)
-    if pct < 1.0:
+    raw_avg = step_count / max(decision_count, 1)
+    pct = round(raw_avg, 1)
+    if raw_avg < 1.0:
         return CheckResult(
             PARTIAL,
             f"{step_count} trace steps across {decision_count} decisions (avg {pct:.1f} steps/decision).",

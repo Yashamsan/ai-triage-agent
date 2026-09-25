@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS pl_nodes (
     node_type   VARCHAR(50) NOT NULL,   -- Decision | Policy | Precedent | Entity | ContextSnapshot
     properties  JSONB NOT NULL DEFAULT '{}',
     path        LTREE,                   -- hierarchy navigation (e.g. "triage.severity.high")
-    embedding   VECTOR(384),             -- pgvector for semantic search
+    embedding   VECTOR(1024),            -- pgvector for semantic search (BAAI/bge-m3, see shared/embeddings.py)
     valid_from  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     valid_to    TIMESTAMPTZ,
     created_at  TIMESTAMPTZ DEFAULT NOW()

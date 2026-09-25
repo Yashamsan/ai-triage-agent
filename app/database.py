@@ -35,7 +35,7 @@ def get_conn():
 
 def apply_schema() -> None:
     """Run app/schema.sql against the database (idempotent — IF NOT EXISTS)."""
-    sql = (Path(__file__).parent / "schema.sql").read_text()
+    sql = (Path(__file__).parent / "schema.sql").read_text(encoding="utf-8")
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
@@ -51,7 +51,7 @@ def apply_schema_v2() -> None:
     sql_path = Path(__file__).parent / "schema_v2.sql"
     if not sql_path.exists():
         return
-    sql = sql_path.read_text()
+    sql = sql_path.read_text(encoding="utf-8")
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
@@ -68,7 +68,25 @@ def apply_schema_v3() -> None:
     sql_path = Path(__file__).parent / "schema_v3.sql"
     if not sql_path.exists():
         return
-    sql = sql_path.read_text()
+    sql = sql_path.read_text(encoding="utf-8")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+
+
+def apply_schema_rmf() -> None:
+    """Run app/schema_rmf.sql — SDAIA-P145 Risk Management Framework tables.
+
+    Adds rmf_contexts, rmf_risks, rmf_assessments, rmf_treatments, rmf_reviews.
+    No FK into pl_agents or the SDAIA Responsible AI Policy agents table —
+    standalone module, zero impact on that module's data.
+    No-op if schema_rmf.sql is not present.
+    """
+    sql_path = Path(__file__).parent / "schema_rmf.sql"
+    if not sql_path.exists():
+        return
+    sql = sql_path.read_text(encoding="utf-8")
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
@@ -96,17 +114,40 @@ def find_faq(intent: str, embedding: list[float]) -> dict | None:
 
 
 # ── Knowledge base (product_inquiry) ─────────────────────────────────
+#
+# Keyword-overlap boost: pure cosine similarity can rank an unrelated entry
+# above a near-exact term match (confirmed on the Arabic side against this
+# same KB — see app_ar/database.py for the full story). Re-ranking a wider
+# candidate pool by literal keyword overlap catches those cases without
+# needing a different embedding model.
 
-def find_kb_chunk(embedding: list[float], lang: str = "en", min_similarity: float = 0.35) -> dict | None:
-    """Return the closest knowledge-base chunk in the given language, or None
-    if nothing clears min_similarity (unlike FAQ lookup, this isn't filtered
-    by intent, so a weak match is more likely and shouldn't be presented as
-    an answer).
+# -- Retrieval ---------------------------------------------------------
+#
+# Formerly a keyword-overlap re-ranker sat on top of vector similarity here
+# (same pattern as app_ar/database.py, which had a measured golden-set
+# eval), compensating for all-MiniLM-L6-v2's weaker similarity signal.
+# Removed for the same reason after switching to BAAI/bge-m3 (see
+# shared/embeddings.py): a keyword-overlap crutch tuned for a weak
+# embedding model actively overrides a trustworthy one's correct top-1
+# pick when a single generic word happens to overlap.
+#
+# min_similarity=0.45 carries over the value measured against the Arabic
+# KB (scripts/eval_kb_retrieval.py, 90% on its golden set) -- same
+# embedding model and similarly-structured KB content, but NOT
+# independently measured for English; there is no English golden set yet.
+# Build one (mirroring scripts/eval_kb_retrieval.py) before relying on this
+# threshold for anything high-stakes on the English side.
 
-    0.35, not 0.5: measured against this real KB, genuine correct matches
-    for plainly-phrased questions ("what mobile packages do you offer")
-    scored as low as 0.47, while irrelevant queries ("tell me a joke") top
-    out around 0.10-0.15 — there's a wide, safe gap between them."""
+
+def find_kb_chunk(
+    embedding: list[float], query_text: str = "", lang: str = "en", min_similarity: float = 0.45,
+) -> dict | None:
+    """Return the best knowledge-base chunk in the given language, or None if
+    nothing qualifies (not filtered by intent, so a weak match is more likely).
+
+    query_text is unused now (kept for call-site compatibility) -- see module
+    notes above; pure vector similarity is the whole story since the bge-m3
+    embedding swap."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
@@ -120,10 +161,11 @@ def find_kb_chunk(embedding: list[float], lang: str = "en", min_similarity: floa
                 """,
                 (str(embedding), lang, str(embedding)),
             )
-            row = cur.fetchone()
-            if row and row["similarity"] >= min_similarity:
-                return row
-            return None
+            best = cur.fetchone()
+
+    if best and best["similarity"] >= min_similarity:
+        return best
+    return None
 
 
 def delete_kb_chunks_for_file(source_file: str) -> int:
