@@ -12,6 +12,8 @@ import litellm
 from langfuse import get_client, observe
 from pydantic import BaseModel
 
+from app.context_engineer import extract_parameters, formulate_query
+
 _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
 
 
@@ -59,6 +61,12 @@ class ClassifierOutput(BaseModel):
     intent: str
     confidence: float
     needs_escalation: bool
+    # Level 2 (app/context_engineer.py) — same fields, same reasoning, as
+    # app/classifier.py's ClassifierOutput. Optional/default None so both
+    # this file's error fallbacks and any existing caller keep working
+    # unchanged.
+    parameters: dict | None = None
+    tool_query: str | None = None
 
 
 @observe(name="classify_ar", as_type="generation")
@@ -134,4 +142,21 @@ def classify_ar(message: str) -> ClassifierOutput:
 
     if result.intent not in VALID_INTENTS:
         result.intent = "unknown"
+
+    # Level 2: extract structured parameters and formulate a precise tool query.
+    # extract_parameters()'s regexes already handle Arabic (حساب/تذكرة/فاتورة/
+    # ريال + Arabic month names) — same shared module as the English side,
+    # not a separate Arabic copy.
+    params = extract_parameters(message)
+    if params.has_any():
+        result.parameters = {
+            "account_id": params.account_id,
+            "ticket_id": params.ticket_id,
+            "phone": params.phone,
+            "invoice_id": params.invoice_id,
+            "amount": params.amount,
+            "period": params.period,
+        }
+        result.tool_query = formulate_query(result.intent, params)
+
     return result

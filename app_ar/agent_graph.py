@@ -37,6 +37,11 @@ class AgentState(TypedDict):
     intent: str
     confidence: float
     needs_escalation: bool
+    # Level 2 (app/context_engineer.py): precise tool query formulated from
+    # intent + extracted params. Unused by tool_runner_node until structured
+    # backend tools exist to dispatch it to — threaded through now so adding
+    # those later doesn't require touching the graph wiring.
+    tool_query: str | None
     # Reflection output
     needs_revision: bool
     revised_intent: str | None
@@ -83,6 +88,7 @@ def classifier_node(state: AgentState) -> dict:
         "intent": result.intent,
         "confidence": result.confidence,
         "needs_escalation": result.needs_escalation,
+        "tool_query": result.tool_query,
         "context_history": context_history,
         "precedent_context": precedent_text,
         "trace_steps": [{

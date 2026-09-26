@@ -13,6 +13,8 @@ import litellm
 from langfuse import get_client, observe
 from pydantic import BaseModel
 
+from app.context_engineer import extract_parameters, formulate_query
+
 _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
 
 
@@ -58,6 +60,13 @@ class ClassifierOutput(BaseModel):
     intent: str
     confidence: float
     needs_escalation: bool
+    # Level 2 (app/context_engineer.py): structured params extracted from the
+    # message, and a precise tool query formulated from intent + those params.
+    # Both optional and default to None so every existing caller that builds
+    # a ClassifierOutput with just the three original fields (this file's own
+    # two error fallbacks included) keeps working unchanged.
+    parameters: dict | None = None
+    tool_query: str | None = None
 
 
 @observe(name="classify", as_type="generation")
@@ -119,4 +128,18 @@ def classify(message: str) -> ClassifierOutput:
 
     if result.intent not in VALID_INTENTS:
         result.intent = "unknown"
+
+    # Level 2: extract structured parameters and formulate a precise tool query
+    params = extract_parameters(message)
+    if params.has_any():
+        result.parameters = {
+            "account_id": params.account_id,
+            "ticket_id": params.ticket_id,
+            "phone": params.phone,
+            "invoice_id": params.invoice_id,
+            "amount": params.amount,
+            "period": params.period,
+        }
+        result.tool_query = formulate_query(result.intent, params)
+
     return result
