@@ -1,0 +1,196 @@
+{
+  "meta": {
+    "name": "Golden Dataset — Triage Agent (Level 2)",
+    "version": "1.0",
+    "date": "2026-09-27",
+    "description": "Evaluation scenarios for Metrics-Driven Development. Each scenario tests intent classification + parameter extraction + tool_query formulation.",
+    "languages": ["en", "ar"],
+    "intents": [
+      "billing", "technical_support", "password_reset",
+      "escalation", "product_inquiry", "greeting", "unknown"
+    ],
+    "total_scenarios": 20
+  },
+  "scenarios": [
+    {
+      "id": "G-001",
+      "language": "ar",
+      "message": "فحص فاتورة رقم INV-12345 لحساب ACC-55 للشهر الماضي",
+      "expected_intent": "billing",
+      "expected_parameters": {"account_id": "ACC-55", "invoice_id": "INV-12345", "period": "last"},
+      "expected_tool": "get_invoice",
+      "has_parameters": true
+    },
+    {
+      "id": "G-002",
+      "language": "en",
+      "message": "Check invoice INV-99999 for account ACC-123",
+      "expected_intent": "billing",
+      "expected_parameters": {"account_id": "ACC-123", "invoice_id": "INV-99999"},
+      "expected_tool": "get_invoice",
+      "has_parameters": true
+    },
+    {
+      "id": "G-003",
+      "language": "ar",
+      "message": "كم رصيدي الحالي في الفاتورة؟",
+      "expected_intent": "billing",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-004",
+      "language": "ar",
+      "message": "عندي مشكلة في الخط رقم TK-98765",
+      "expected_intent": "technical_support",
+      "expected_parameters": {"ticket_id": "TK-98765"},
+      "expected_tool": "get_ticket_status",
+      "has_parameters": true
+    },
+    {
+      "id": "G-005",
+      "language": "en",
+      "message": "My internet is down, ticket TK-54321",
+      "expected_intent": "technical_support",
+      "expected_parameters": {"ticket_id": "TK-54321"},
+      "expected_tool": "get_ticket_status",
+      "has_parameters": true
+    },
+    {
+      "id": "G-006",
+      "language": "ar",
+      "message": "نسيت كلمة المرور لحساب ACC-77",
+      "expected_intent": "password_reset",
+      "expected_parameters": {"account_id": "ACC-77"},
+      "expected_tool": "reset_password",
+      "has_parameters": true
+    },
+    {
+      "id": "G-007",
+      "language": "en",
+      "message": "Reset my password for account ACC-88",
+      "expected_intent": "password_reset",
+      "expected_parameters": {"account_id": "ACC-88"},
+      "expected_tool": "reset_password",
+      "has_parameters": true
+    },
+    {
+      "id": "G-008",
+      "language": "ar",
+      "message": "أريد تصعيد شكوى تعويض 500 ريال",
+      "expected_intent": "escalation",
+      "expected_parameters": {"amount": 500.0},
+      "expected_tool": "escalate_ticket",
+      "has_parameters": true
+    },
+    {
+      "id": "G-009",
+      "language": "en",
+      "message": "Escalate my complaint, I want 300 SAR compensation",
+      "expected_intent": "escalation",
+      "expected_parameters": {"amount": 300.0},
+      "expected_tool": "escalate_ticket",
+      "has_parameters": true
+    },
+    {
+      "id": "G-010",
+      "language": "ar",
+      "message": "كم سعر باقة الإنترنت الجديدة؟",
+      "expected_intent": "product_inquiry",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-011",
+      "language": "en",
+      "message": "What are your data plan prices?",
+      "expected_intent": "product_inquiry",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-012",
+      "language": "ar",
+      "message": "السلام عليكم",
+      "expected_intent": "greeting",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-013",
+      "language": "en",
+      "message": "Hi, how are you?",
+      "expected_intent": "greeting",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-014",
+      "language": "ar",
+      "message": "اكتب لي قصيدة عن الرياض",
+      "expected_intent": "unknown",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-015",
+      "language": "en",
+      "message": "Tell me a joke",
+      "expected_intent": "unknown",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-016",
+      "language": "ar",
+      "message": "عندي انقطاع في الخدمة من يومين ورقم حسابي ACC-101 والتذكرة TK-11111",
+      "expected_intent": "technical_support",
+      "expected_parameters": {"account_id": "ACC-101", "ticket_id": "TK-11111"},
+      "expected_tool": "get_ticket_status",
+      "has_parameters": true
+    },
+    {
+      "id": "G-017",
+      "language": "en",
+      "message": "When does my next invoice come out?",
+      "expected_intent": "billing",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    },
+    {
+      "id": "G-018",
+      "language": "ar",
+      "message": "بدي أغير الباسورد لحساب ACC-33",
+      "expected_intent": "password_reset",
+      "expected_parameters": {"account_id": "ACC-33"},
+      "expected_tool": "reset_password",
+      "has_parameters": true
+    },
+    {
+      "id": "G-019",
+      "language": "ar",
+      "message": "شكوى على الخدمة 200 ريال تعويض حساب ACC-22",
+      "expected_intent": "escalation",
+      "expected_parameters": {"account_id": "ACC-22", "amount": 200.0},
+      "expected_tool": "escalate_ticket",
+      "has_parameters": true
+    },
+    {
+      "id": "G-020",
+      "language": "en",
+      "message": "I want to buy a new fiber plan for my company",
+      "expected_intent": "product_inquiry",
+      "expected_parameters": {},
+      "expected_tool": null,
+      "has_parameters": false
+    }
+  ]
+}

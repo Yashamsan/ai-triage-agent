@@ -1,0 +1,40 @@
+name: Golden Dataset Eval
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install CPU-only torch
+        # sentence-transformers (in requirements.txt) pulls in torch as a
+        # dependency; without this, pip resolves whatever default wheel it
+        # wants, which now defaults to a multi-GB CUDA build (see
+        # Dockerfile's own comment on this) -- pointless and slow on an
+        # Ubuntu runner with no GPU.
+        run: pip install --no-cache-dir torch --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run golden dataset evaluation
+        env:
+          # The classifiers (app/classifier.py, app_ar/classifier.py) default
+          # to deepseek/deepseek-chat and read this key -- not
+          # OPENROUTER_API_KEY, which nothing in classify()'s call path uses.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          python tests/eval_golden.py

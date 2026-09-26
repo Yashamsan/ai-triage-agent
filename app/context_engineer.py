@@ -88,6 +88,22 @@ def extract_parameters(message: str) -> ExtractedParams:
     msg_lower = message.lower()
     for name, code in {**AR_MONTHS, **EN_MONTHS}.items():
         if name in msg_lower or name in message:
+            # False-positive guard: 'الحالي'/'current' both mean "current" in
+            # the generic adjective sense too (e.g. "رصيدي الحالي" = "my
+            # CURRENT balance", nothing to do with a month) -- only treat it
+            # as a period reference when it's actually adjacent to a
+            # month/year word. Checks both word orders: Arabic puts the
+            # temporal word first ("الشهر الحالي"), English puts it last
+            # ("current month") -- a one-directional check would silently
+            # break whichever language it didn't cover.
+            if code == 'current':
+                temporal_context = (
+                    r'(?:الشهر|شهر|عام|month|year)\s*' + re.escape(name)
+                    + r'|' + re.escape(name) + r'\s*(?:month|year|الشهر|شهر|عام)'
+                )
+                if not re.search(temporal_context, message, re.IGNORECASE):
+                    continue
+
             year_m = re.search(r'(20\d{2})', message)
             year = year_m.group(1) if year_m else '2026'
             if code == 'current':
