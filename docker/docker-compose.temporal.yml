@@ -56,5 +56,36 @@ services:
       - "127.0.0.1:8233:8080"
     restart: unless-stopped
 
+  # Polls Temporal for TriageAgentWorkflow work (app/temporal_worker.py) --
+  # without this, POST /triage/durable (app/temporal_routes.py) accepts a
+  # workflow but nothing ever executes it. Reuses the triage-agent image
+  # (same requirements: DEEPSEEK_API_KEY, DATABASE_URL, sentence-transformers
+  # for the KB lookups its activities may trigger) rather than building a
+  # second one. Opt-in and isolated in this file: nothing about
+  # docker-compose.yml's triage-agent/triage-db stack changes, and this
+  # container talks to triage-db over docker_default (confirmed via `docker
+  # network inspect` that both compose files' containers land on it) without
+  # needing to be defined in that file.
+  temporal-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: docker-triage-agent:latest
+    command: ["python", "-m", "app.temporal_worker"]
+    depends_on:
+      - temporal
+    env_file: ../.env
+    environment:
+      TEMPORAL_ADDRESS: "temporal:7233"
+      DATABASE_URL: "postgresql://postgres:postgres@triage-db:5432/triage_agent"
+    # The base image's HEALTHCHECK (Dockerfile) polls http://localhost:8000/health
+    # -- correct for the triage-agent container, meaningless here since this
+    # command runs the worker script instead of uvicorn and never binds port
+    # 8000. Without disabling it, `docker ps` would show this container as
+    # permanently "unhealthy" even while it's working correctly.
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
 volumes:
   temporal_postgres_data:

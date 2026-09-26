@@ -23,6 +23,7 @@ inserts fail outright.
 from __future__ import annotations
 
 import os
+import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -38,6 +39,16 @@ EMBEDDING_DIM = 1024
 _DEVICE_OVERRIDE = os.getenv("EMBEDDING_DEVICE")
 
 _model: _ST | None = None
+# Guards _model's lazy init. The plain "if _model is None: load" pattern
+# isn't thread-safe -- app/temporal_worker.py runs activities on a
+# ThreadPoolExecutor(max_workers=10), and two concurrent first-callers used
+# to both see _model as None and each kick off their own full model load
+# (visibly two interleaved "Loading weights" progress bars in the worker's
+# logs), doubling memory/CPU load on an already CPU-constrained host and
+# turning what should be a several-second embed() call into a multi-minute
+# hang. Everything after the first caller now blocks on the lock instead of
+# redoing the load themselves.
+_model_lock = threading.Lock()
 
 
 def _select_device() -> str:
@@ -56,22 +67,24 @@ def _select_device() -> str:
 def _get_model() -> _ST:
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
+        with _model_lock:
+            if _model is None:  # re-check: another thread may have won the race
+                from sentence_transformers import SentenceTransformer
 
-        device = _select_device()
-        model = SentenceTransformer(MODEL_NAME, device=device)
-        if device == "cuda":
-            # A 4-6GB card can't comfortably hold bge-m3 in fp32 (~2.2GB
-            # weights + CUDA context overhead, easily 3GB+ under real
-            # inference) alongside whatever else is using the GPU. fp16
-            # roughly halves that with no meaningful quality loss for
-            # cosine-similarity search, and every CUDA GPU this app is
-            # likely to run on (Turing/GTX 16xx or newer) supports it
-            # natively.
-            model = model.half()
-        print(f"[shared.embeddings] {MODEL_NAME} loaded on device={device}"
-              + (" (fp16)" if device == "cuda" else ""))
-        _model = model
+                device = _select_device()
+                model = SentenceTransformer(MODEL_NAME, device=device)
+                if device == "cuda":
+                    # A 4-6GB card can't comfortably hold bge-m3 in fp32
+                    # (~2.2GB weights + CUDA context overhead, easily 3GB+
+                    # under real inference) alongside whatever else is using
+                    # the GPU. fp16 roughly halves that with no meaningful
+                    # quality loss for cosine-similarity search, and every
+                    # CUDA GPU this app is likely to run on (Turing/GTX 16xx
+                    # or newer) supports it natively.
+                    model = model.half()
+                print(f"[shared.embeddings] {MODEL_NAME} loaded on device={device}"
+                      + (" (fp16)" if device == "cuda" else ""))
+                _model = model
     return _model
 
 

@@ -3,12 +3,14 @@
 Additive and separate from the main POST /triage endpoint (app/main.py,
 LangGraph-based) — nothing about the existing flow changes. This is a demo
 of durable execution: requires docker/docker-compose.temporal.yml running
-plus a worker process (python -m app.temporal_worker). If Temporal isn't
-reachable, this endpoint fails with a clear 503 rather than silently
-falling back to the non-durable path.
+plus a worker process (python -m app.temporal_worker, or the temporal-worker
+service in that same compose file). If Temporal isn't reachable, this
+endpoint fails with a clear 503 rather than silently falling back to the
+non-durable path.
 """
 from __future__ import annotations
 
+import os
 import uuid
 
 from fastapi import APIRouter, HTTPException
@@ -20,7 +22,15 @@ from app.temporal_workflows import TriageAgentWorkflow
 router = APIRouter(prefix="/triage", tags=["durable"])
 
 TASK_QUEUE = "triage-queue"
-TEMPORAL_ADDRESS = "localhost:7233"
+# "localhost:7233" is correct when this app runs directly on the host (the
+# manual, non-Docker setup) since docker-compose.temporal.yml forwards that
+# port. Inside the triage-agent container, "localhost" is the container
+# itself, not the Temporal container — docker-compose.temporal.yml's
+# temporal-worker service (and this app's own container, if you want
+# /triage/durable reachable from there too) must set TEMPORAL_ADDRESS to
+# "temporal:7233" instead, the service name on the shared docker_default
+# network.
+TEMPORAL_ADDRESS = os.getenv("TEMPORAL_ADDRESS", "localhost:7233")
 
 _client: Client | None = None
 

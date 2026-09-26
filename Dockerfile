@@ -47,6 +47,12 @@ COPY --chown=appuser:appuser ui/ ./ui/
 RUN mkdir -p audit_data && chown appuser:appuser audit_data
 ENV PATH="/home/appuser/.local/bin:$PATH"
 ENV PYTHONPATH="/home/appuser/app"
+# Without this, stdout is block-buffered when not attached to a TTY (true
+# for `docker logs`), so print()-based startup/progress messages sit
+# invisible in the buffer for a long time -- repeatedly mistaken for a
+# hang this session (app/temporal_worker.py's "Connecting..."/"Connected."
+# lines included) when the process was actually fine, just not flushing.
+ENV PYTHONUNBUFFERED=1
 USER appuser
 
 # Pre-download the embedding model into the image so a fresh container

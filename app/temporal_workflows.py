@@ -20,7 +20,15 @@ with workflow.unsafe.imports_passed_through():
         run_tool_activity,
     )
 
-_ACTIVITY_TIMEOUT = timedelta(seconds=60)
+# 60s originally -- too short for this pipeline's real, measured latency:
+# classify/run_tool/generate_response each make an LLM call and/or an
+# embedding lookup, which on a CPU-constrained host have run anywhere from
+# ~8s to 90s+ this session (see shared/embeddings.py, app/classifier.py).
+# A too-tight timeout doesn't fail fast here -- it fails *after* the
+# activity's real work already completed, visible server-side as "Activity
+# not found on completion ... activity already timed out". 180s gives
+# comfortable headroom above the worst case measured so far.
+_ACTIVITY_TIMEOUT = timedelta(seconds=180)
 
 
 @workflow.defn

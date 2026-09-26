@@ -157,6 +157,15 @@ services:
       # Remove this line to re-enable GPU once more headroom is available
       # (e.g. a machine with more RAM, or freeing enough on this one).
       EMBEDDING_DEVICE: "cpu"
+      # POST /triage/durable (app/temporal_routes.py) defaults to
+      # "localhost:7233", correct only when this app runs on the host
+      # directly. From inside this container, "temporal" (the service name
+      # in docker-compose.temporal.yml) is reachable over the shared
+      # docker_default network once that stack is up — see this repo's
+      # docker-compose.temporal.yml for how to bring Temporal + its worker
+      # up. Harmless if that stack isn't running: /triage/durable just
+      # 503s, and every other endpoint is unaffected either way.
+      TEMPORAL_ADDRESS: "temporal:7233"
     volumes:
       - triage_audit_data:/home/appuser/app/audit_data
     restart: unless-stopped
